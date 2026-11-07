@@ -21,6 +21,31 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(str(Path(__file__).resolve().parents[1] / "assets" / "interview-copilot.svg")))
         self.resize(1050, 760)
         self.setMinimumSize(760, 560)
+        self.setStyleSheet("""
+            QMainWindow, QWidget { background: #111827; color: #e8eef8; }
+            QLabel { color: #e8eef8; }
+            QLineEdit, QTextEdit, QComboBox {
+                background: #1b2638; color: #edf4ff;
+                border: 1px solid #344763; border-radius: 7px;
+                padding: 7px; selection-background-color: #4169a5;
+            }
+            QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+                border: 1px solid #79a9ed;
+            }
+            QPushButton {
+                background: #263a58; color: #f2f6ff;
+                border: 1px solid #405c83; border-radius: 7px;
+                padding: 7px 12px; font-weight: 600;
+            }
+            QPushButton:hover { background: #34527b; }
+            QPushButton:pressed { background: #1d2d45; }
+            QPushButton:disabled { color: #7f8da3; background: #202b3b; }
+            QComboBox QAbstractItemView {
+                background: #1b2638; color: #edf4ff;
+                selection-background-color: #34527b;
+            }
+            QSplitter::handle { background: #293a52; }
+        """)
         self.pool = QThreadPool.globalInstance()
         self.ollama = OllamaClient()
         self.rag = ResumeRAG(self.ollama)

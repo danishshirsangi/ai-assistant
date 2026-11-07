@@ -1,45 +1,76 @@
-# Audio subsystem — Version 0.2
+# Audio subsystem
 
-## Included
-- Global push-to-talk using Control (press to start, release to stop).
-- In-app Start/Stop fallback.
-- Microphone capture via sounddevice, saved as WAV.
-- Microphone selector for macOS default, OnePlus Buds, MacBook built-in mic, or other available input devices.
-- Refresh button to rescan devices after connecting or disconnecting a headset; input selection is locked during recording.
-- System audio via Apple's ScreenCaptureKit Swift helper, saved as M4A.
-- Local transcription via MLX Whisper on Apple Silicon.
-- Separate microphone / system-audio labels.
-- Local Ollama transcript cleanup preserving meaningful technical and conversational context.
-- Interview answer generation in the main app and floating overlay.
+The audio subsystem captures the user's microphone and Mac system audio, transcribes both tracks locally, and passes transcript text to the app's local answer-generation workflow.
 
-## Setup
-Install Xcode Command Line Tools:
+## Controls
+
+- **F8 press:** start recording.
+- **F8 press again:** stop recording and begin transcription.
+- Holding F8 is not required.
+- The in-app Start/Stop button is the fallback.
+- The microphone dropdown selects the input device; Refresh rescans devices. Device selection is locked during recording.
+
+## Components
+
+| Component | Responsibility |
+|---|---|
+| `controller.py` | F8 toggle, microphone capture, Swift helper lifecycle, temporary-file cleanup |
+| `macos_system_audio.swift` | ScreenCaptureKit system audio capture and AVFoundation M4A writer |
+| `transcriber.py` | MLX Whisper local transcription |
+
+## Install
+
+From the repository root with the Python 3.12 virtual environment active:
 
 ```bash
 xcode-select --install
+python -m pip install -r requirements-audio-macos.txt
 ```
 
-Install audio dependencies from the project root:
+The app compiles the Swift helper automatically on the first recording. MLX Whisper downloads its model on first transcription.
 
-```bash
-pip install -r requirements-audio-macos.txt
-```
+### Dependencies
 
-The Swift helper is compiled automatically on first recording. Whisper model files
-are downloaded once on first transcription; inference then runs locally.
+- `sounddevice`: microphone capture via PortAudio.
+- `soundfile`: temporary WAV output for microphone audio.
+- `numpy`: audio frame buffering/concatenation.
+- `pynput`: global F8 keyboard listener.
+- `mlx-whisper`: local Apple Silicon Whisper inference.
+- `pyobjc-framework-Cocoa`: macOS capture-privacy window API.
+- Xcode Command Line Tools: `swiftc` compiler and macOS SDK for the ScreenCaptureKit helper.
 
-## macOS permissions
-- Microphone: allow the Python app.
-- Screen & System Audio Recording: allow the terminal/Python app.
-- Accessibility / Input Monitoring: allow the app for the global Control shortcut.
+**FFmpeg is optional, not an app dependency.** The current app writes WAV using SoundFile and M4A using AVFoundation; Whisper reads these files directly. Install FFmpeg only for manual conversion or audio diagnostics: `brew install ffmpeg`.
 
-Restart after changing permissions. If the global shortcut is blocked, use the
-visible Start/Stop button.
+## Capture and transcription lifecycle
+
+1. F8 starts a new unique temporary session.
+2. Microphone frames are buffered by sounddevice.
+3. ScreenCaptureKit writes system audio to M4A.
+4. The second F8 press stops capture and finalizes both tracks.
+5. MLX Whisper transcribes each track locally.
+6. The temporary session directory is removed in a `finally` block, even if transcription fails.
+7. A new F8 press creates a separate fresh session.
+
+Audio is temporarily written under the operating system's temp directory; it is not retained in the repository's `data/` directory. Startup cleanup attempts to remove stale folders belonging to processes that are no longer running.
+
+## Permissions
+
+Grant the launching app (Terminal, VS Code, etc.):
+
+- Microphone
+- Screen & System Audio Recording
+- Accessibility / Input Monitoring for the global F8 shortcut
+
+Restart the launching app after changing permissions. macOS permission labels vary by version.
+
+## Troubleshooting
+
+- **F8 unavailable:** grant Accessibility/Input Monitoring or use the in-app button.
+- **Mic unavailable:** grant Microphone access and select/refresh the correct input device.
+- **System audio unavailable:** macOS 13+, Screen & System Audio Recording permission and Xcode Command Line Tools are required.
+- **Native segmentation fault:** use a clean Python 3.12 environment and reinstall both requirements files; native packages may crash without a Python traceback.
+- **Whisper first run:** model download requires internet; later inference runs locally.
 
 ## Privacy
-Audio is stored in `data/audio_sessions/`, which is ignored by Git. Do not record
-without appropriate participant consent and workplace authorization.
 
-## Current limits
-Transcription begins after recording stops; there are no live streaming captions yet.
-English is the default language. System audio requires macOS 13+.
+Only record with required participant consent and workplace authorization. Temporary-file cleanup is not secure erasure and should not be treated as a guarantee against forensic recovery.

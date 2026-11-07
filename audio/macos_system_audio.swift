@@ -7,13 +7,15 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     private let writer: AVAssetWriter
     private let input: AVAssetWriterInput
     private var stream: SCStream?
+    private var receivedAudioBuffers = 0
+    private var appendedAudioBuffers = 0
 
     init(url: URL) throws {
         writer = try AVAssetWriter(outputURL: url, fileType: .m4a)
         input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 16000,
-            AVNumberOfChannelsKey: 1,
+            AVSampleRateKey: 48000,
+            AVNumberOfChannelsKey: 2,
             AVEncoderBitRateKey: 64000
         ])
         input.expectsMediaDataInRealTime = true
@@ -38,9 +40,9 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         config.width = 2
         config.height = 2
         config.capturesAudio = true
-        config.sampleRate = 16000
-        config.channelCount = 1
-        config.excludesCurrentProcessAudio = true
+        config.sampleRate = 48000
+        config.channelCount = 2
+        config.excludesCurrentProcessAudio = false
         let capture = SCStream(filter: filter, configuration: config, delegate: self)
         try capture.addStreamOutput(
             self, type: .audio,
@@ -62,13 +64,23 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
             throw writer.error ?? NSError(domain: "InterviewCopilot", code: 3,
                 userInfo: [NSLocalizedDescriptionKey: "Could not finish audio file"])
         }
+        guard receivedAudioBuffers > 0, appendedAudioBuffers > 0 else {
+            throw NSError(domain: "InterviewCopilot", code: 4,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "ScreenCaptureKit received no writable system-audio samples. Check macOS Screen & System Audio Recording permission and ensure Google Meet audio is playing through this Mac."])
+        }
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
                 of outputType: SCStreamOutputType) {
-        guard outputType == .audio, CMSampleBufferIsValid(sampleBuffer),
-              input.isReadyForMoreMediaData else { return }
-        input.append(sampleBuffer)
+        guard outputType == .audio, CMSampleBufferIsValid(sampleBuffer) else { return }
+        receivedAudioBuffers += 1
+        guard input.isReadyForMoreMediaData else { return }
+        if input.append(sampleBuffer) {
+            appendedAudioBuffers += 1
+        } else if let error = writer.error {
+            fputs("Audio writer append failed: \\(error.localizedDescription)\\n", stderr)
+        }
     }
 }
 

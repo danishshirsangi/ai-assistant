@@ -4,9 +4,9 @@ The audio subsystem captures the user's microphone and Mac system audio, transcr
 
 ## Controls
 
-- **F8 press:** start recording.
-- **F8 press again:** stop recording and begin transcription.
-- Holding F8 is not required.
+- **Control + Option + Command + R press:** start recording.
+- **Control + Option + Command + R press again:** stop recording and begin transcription.
+- Holding Control + Option + Command + R is not required.
 - The in-app Start/Stop button is the fallback.
 - The microphone dropdown selects the input device; Refresh rescans devices. Device selection is locked during recording.
 
@@ -14,7 +14,7 @@ The audio subsystem captures the user's microphone and Mac system audio, transcr
 
 | Component | Responsibility |
 |---|---|
-| `controller.py` | F8 toggle, microphone capture, Swift helper lifecycle, temporary-file cleanup |
+| `controller.py` | Control + Option + Command + R toggle, microphone capture, Swift helper lifecycle, temporary-file cleanup |
 | `macos_system_audio.swift` | ScreenCaptureKit system audio capture and AVFoundation M4A writer |
 | `transcriber.py` | MLX Whisper local transcription |
 
@@ -34,7 +34,7 @@ The app compiles the Swift helper automatically on the first recording. MLX Whis
 - `sounddevice`: microphone capture via PortAudio.
 - `soundfile`: temporary WAV output for microphone audio.
 - `numpy`: audio frame buffering/concatenation.
-- `pynput`: global F8 keyboard listener.
+- `pynput`: global Control + Option + Command + R keyboard listener.
 - `mlx-whisper`: local Apple Silicon Whisper inference.
 - `pyobjc-framework-Cocoa`: macOS capture-privacy window API.
 - Xcode Command Line Tools: `swiftc` compiler and macOS SDK for the ScreenCaptureKit helper.
@@ -43,13 +43,13 @@ The app compiles the Swift helper automatically on the first recording. MLX Whis
 
 ## Capture and transcription lifecycle
 
-1. F8 starts a new unique temporary session.
+1. Control + Option + Command + R starts a new unique temporary session.
 2. Microphone frames are buffered by sounddevice.
 3. ScreenCaptureKit writes system audio to M4A.
-4. The second F8 press stops capture and finalizes both tracks.
+4. The second Control + Option + Command + R press stops capture and finalizes both tracks.
 5. MLX Whisper transcribes each track locally.
 6. The temporary session directory is removed in a `finally` block, even if transcription fails.
-7. A new F8 press creates a separate fresh session.
+7. A new Control + Option + Command + R press creates a separate fresh session.
 
 Audio is temporarily written under the operating system's temp directory; it is not retained in the repository's `data/` directory. Startup cleanup attempts to remove stale folders belonging to processes that are no longer running.
 
@@ -59,13 +59,13 @@ Grant the launching app (Terminal, VS Code, etc.):
 
 - Microphone
 - Screen & System Audio Recording
-- Accessibility / Input Monitoring for the global F8 shortcut
+- Accessibility / Input Monitoring for the global Control + Option + Command + R shortcut
 
 Restart the launching app after changing permissions. macOS permission labels vary by version.
 
 ## Troubleshooting
 
-- **F8 unavailable:** grant Accessibility/Input Monitoring or use the in-app button.
+- **Control + Option + Command + R unavailable:** grant Accessibility/Input Monitoring or use the in-app button.
 - **Mic unavailable:** grant Microphone access and select/refresh the correct input device.
 - **System audio unavailable:** macOS 13+, Screen & System Audio Recording permission and Xcode Command Line Tools are required.
 - **Native segmentation fault:** use a clean Python 3.12 environment and reinstall both requirements files; native packages may crash without a Python traceback.

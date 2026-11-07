@@ -10,6 +10,7 @@ from core.answer_generator import AnswerGenerator
 from ui.worker import FunctionWorker
 from ui.floating_overlay import FloatingOverlay
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -22,13 +23,16 @@ class MainWindow(QMainWindow):
         self.generator = AnswerGenerator(self.ollama, self.rag)
         self.history = []
         self.overlay = FloatingOverlay()
+        self.audio = None
         self._build_ui()
+        self._setup_audio()
         self._check_server()
 
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
+
         top = QHBoxLayout()
         title = QLabel("Interview Copilot")
         title.setStyleSheet("font-size: 23px; font-weight: 700;")
@@ -62,12 +66,22 @@ class MainWindow(QMainWindow):
         self.chat.setStyleSheet("font-size: 14px; padding: 8px;")
         self.transcript = QTextEdit()
         self.transcript.setReadOnly(True)
-        self.transcript.setMaximumHeight(105)
-        self.transcript.setPlaceholderText("Resume status and future audio transcript preview.")
+        self.transcript.setMaximumHeight(125)
+        self.transcript.setPlaceholderText("Live transcript will appear here after push-to-talk.")
         splitter.addWidget(self.chat)
         splitter.addWidget(self.transcript)
-        splitter.setSizes([550, 105])
+        splitter.setSizes([530, 125])
         root.addWidget(splitter, 1)
+
+        audio_bar = QHBoxLayout()
+        self.record_button = QPushButton("Start recording")
+        self.record_button.setToolTip("Hold Control anywhere to record; release to stop.")
+        self.record_button.clicked.connect(self._toggle_recording)
+        self.audio_hint = QLabel("Hold Control to talk · mic + system audio · local transcription")
+        self.audio_hint.setStyleSheet("color: #777; font-size: 11px;")
+        audio_bar.addWidget(self.record_button)
+        audio_bar.addWidget(self.audio_hint, 1)
+        root.addLayout(audio_bar)
 
         bottom = QHBoxLayout()
         self.question = QLineEdit()
@@ -79,14 +93,27 @@ class MainWindow(QMainWindow):
         bottom.addWidget(self.ask_button)
         root.addLayout(bottom)
 
-        note = QLabel("Local mode · Ollama + ChromaDB · Audio capture will be added in the next milestone")
+        note = QLabel("Local mode · Ollama + SQLite · audio captured and transcribed on this Mac")
         note.setStyleSheet("color: #777; font-size: 11px;")
         root.addWidget(note)
+
+    def _setup_audio(self):
+        try:
+            from audio.controller import AudioController
+            self.audio = AudioController()
+            self.audio.recording_changed.connect(self._recording_changed)
+            self.audio.transcript_ready.connect(self._audio_transcript_ready)
+            self.audio.error.connect(self._audio_error)
+            self.audio_hint.setText("Hold Control anywhere to record; release to stop · mic + system audio")
+        except Exception as exc:
+            self.audio_hint.setText("Audio dependencies unavailable. Install requirements-audio-macos.txt")
+            self.record_button.setEnabled(False)
+            self.status.setToolTip(str(exc))
 
     def _check_server(self):
         worker = FunctionWorker(self.ollama.health)
         worker.signals.result.connect(self._server_ok)
-        worker.signals.error.connect(lambda e: self.status.setText("Ollama offline — run `ollama serve`"))
+        worker.signals.error.connect(lambda e: self.status.setText("Ollama offline — run ollama serve"))
         self.pool.start(worker)
 
     def _server_ok(self, data):
@@ -114,14 +141,19 @@ class MainWindow(QMainWindow):
 
     def _resume_done(self, path, count):
         self.status.setText("Resume indexed")
-        self.transcript.setPlainText(f"Loaded: {Path(path).name}\nIndexed {count} searchable sections locally.")
-        QMessageBox.information(self, "Resume ready", f"Resume indexed successfully.\n{count} sections added to local search.")
+        self.transcript.setPlainText(
+            f"Loaded: {Path(path).name}\nIndexed {count} searchable sections locally."
+        )
+        QMessageBox.information(
+            self, "Resume ready",
+            f"Resume indexed successfully.\n{count} sections added to local search."
+        )
 
     def ask(self):
         question = self.question.text().strip()
         if not question:
             return
-        self.ollama.chat_model = self.model.currentText().split(":")[0] + ":" + ":".join(self.model.currentText().split(":")[1:]) if self.model.currentText() else "qwen3:8b"
+        self.ollama.chat_model = self.model.currentText() or "qwen3:8b"
         self.question.clear()
         self._append("You", question)
         self.ask_button.setEnabled(False)
@@ -130,6 +162,45 @@ class MainWindow(QMainWindow):
         worker.signals.result.connect(lambda answer: self._answer_done(question, answer))
         worker.signals.error.connect(self._show_error)
         self.pool.start(worker)
+
+    def _audio_transcript_ready(self, transcript):
+        self.transcript.setPlainText(transcript)
+        self._append("Live transcript", transcript)
+        self.status.setText("Preparing interview answer…")
+        self.ask_button.setEnabled(False)
+        worker = FunctionWorker(
+            self.generator.answer_from_transcript, transcript, list(self.history)
+        )
+        worker.signals.result.connect(self._audio_answer_done)
+        worker.signals.error.connect(self._show_error)
+        self.pool.start(worker)
+
+    def _audio_answer_done(self, result):
+        cleaned, answer = result
+        self.transcript.setPlainText(cleaned)
+        self._append("Copilot", answer)
+        self.history.extend([
+            {"role": "user", "content": "Live interview transcript:\n" + cleaned},
+            {"role": "assistant", "content": answer},
+        ])
+        self.overlay.set_answer(answer)
+        self.ask_button.setEnabled(True)
+        self.status.setText("Ready")
+        if self.overlay.isVisible():
+            self.overlay.raise_()
+
+    def _recording_changed(self, active):
+        self.record_button.setText("Stop recording" if active else "Start recording")
+        self.status.setText("Recording mic + system audio…" if active else "Transcribing locally…")
+
+    def _toggle_recording(self):
+        if self.audio is not None:
+            self.audio.toggle_recording()
+
+    def _audio_error(self, message):
+        self.status.setText("Audio error")
+        self.audio_hint.setText(message)
+        self.record_button.setText("Start recording")
 
     def _answer_done(self, question, answer):
         self._append("Copilot", answer)
@@ -144,7 +215,10 @@ class MainWindow(QMainWindow):
             self.overlay.raise_()
 
     def _append(self, speaker, text):
-        safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        safe = (
+            text.replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace("\n", "<br>")
+        )
         self.chat.append(f"<p><b>{speaker}</b><br>{safe}</p>")
 
     def _show_error(self, error):
@@ -158,5 +232,7 @@ class MainWindow(QMainWindow):
         self.overlay.set_answer("Your generated answer will appear here.")
 
     def closeEvent(self, event):
+        if self.audio is not None:
+            self.audio.shutdown()
         self.overlay.close()
         event.accept()

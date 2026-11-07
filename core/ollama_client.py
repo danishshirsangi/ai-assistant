@@ -33,7 +33,7 @@ class OllamaClient:
             "stream": on_chunk is not None,
             "think": False,
             "keep_alive": self.keep_alive,
-            "options": {"temperature": temperature, "num_predict": 256},
+            "options": {"temperature": temperature, "num_predict": 1024},
         }
         if on_chunk is None:
             response = requests.post(

@@ -1,7 +1,7 @@
 from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QFileDialog, QMessageBox, QComboBox, QSplitter, QToolTip
+    QTextEdit, QLineEdit, QFileDialog, QMessageBox, QComboBox, QSplitter
 )
 from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtGui import QIcon
@@ -250,21 +250,32 @@ class MainWindow(QMainWindow):
     def _audio_transcript_ready(self, transcript):
         self.transcript.setPlainText(transcript)
         self._append("Live transcript", transcript)
-        self.status.setText("Preparing interview answer…")
+        self.status.setText("Finding relevant context…")
         self.ask_button.setEnabled(False)
+        self._streamed_answer = ""
+        self.overlay.set_answer("Generating answer…")
         worker = FunctionWorker(
-            self.generator.answer_from_transcript, transcript, list(self.history)
+            self.generator.answer_from_transcript,
+            transcript,
+            list(self.history),
+            with_progress=True,
         )
+        worker.signals.progress.connect(self._audio_answer_progress)
         worker.signals.result.connect(self._audio_answer_done)
         worker.signals.error.connect(self._show_error)
         self.pool.start(worker)
 
+    def _audio_answer_progress(self, token):
+        self._streamed_answer += token
+        self.overlay.set_answer(self._streamed_answer)
+        self.status.setText("Generating answer…")
+
     def _audio_answer_done(self, result):
-        cleaned, answer = result
-        self.transcript.setPlainText(cleaned)
+        transcript, answer = result
+        self.transcript.setPlainText(transcript)
         self._append("Copilot", answer)
         self.history.extend([
-            {"role": "user", "content": "Live interview transcript:\n" + cleaned},
+            {"role": "user", "content": "Live interview transcript:\\n" + transcript},
             {"role": "assistant", "content": answer},
         ])
         self.overlay.set_answer(answer)

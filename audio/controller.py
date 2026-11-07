@@ -202,7 +202,15 @@ class AudioController(QObject):
             self._recording = False
         self._cleanup_capture()
         self.recording_changed.emit(False)
-        threading.Thread(target=self._transcribe, daemon=True).start()
+        mic_path, system_path, session_dir = self._mic_path, self._system_path, self._session_dir
+        self._mic_path = None
+        self._system_path = None
+        self._session_dir = None
+        threading.Thread(
+            target=self._transcribe,
+            args=(mic_path, system_path, session_dir),
+            daemon=True,
+        ).start()
 
     def _cleanup_capture(self):
         if self._mic_stream is not None:
@@ -254,15 +262,15 @@ class AudioController(QObject):
                         except (BrokenPipeError, OSError):
                             pass
 
-    def _transcribe(self):
+    def _transcribe(self, mic_path, system_path, session_dir):
         try:
             results = []
-            if self._mic_path and self._mic_path.exists():
-                mic_text = transcribe_local(self._mic_path)
+            if mic_path and mic_path.exists():
+                mic_text = transcribe_local(mic_path)
                 if mic_text:
                     results.append("[YOU / MICROPHONE]\n" + mic_text)
-            if self._system_path and self._system_path.exists():
-                system_text = transcribe_local(self._system_path)
+            if system_path and system_path.exists():
+                system_text = transcribe_local(system_path)
                 if system_text:
                     results.append("[OTHER PARTICIPANTS / SYSTEM AUDIO]\n" + system_text)
             transcript = "\n\n".join(results).strip()
@@ -276,7 +284,8 @@ class AudioController(QObject):
             self.error.emit("Local transcription failed: " + str(exc))
         finally:
             # Keep captured audio only for the local transcription step.
-            self._remove_session_files()
+            if session_dir is not None:
+                shutil.rmtree(session_dir, ignore_errors=True)
 
     def toggle_recording(self):
         if self.is_recording:

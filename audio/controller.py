@@ -38,7 +38,7 @@ class AudioController(QObject):
         self._mic_path = None
         self._system_path = None
         self._listener = None
-        self._control_down = False
+        self._hotkey_down = False
         self.selected_input_device = None  # None means macOS default input
 
     def _cleanup_stale_sessions(self):
@@ -94,29 +94,30 @@ class AudioController(QObject):
             from pynput import keyboard
 
             def on_press(key):
-                if key not in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+                if key != keyboard.Key.f8:
                     return
                 with self._lock:
-                    if self._control_down:
+                    if self._hotkey_down:
                         return
-                    self._control_down = True
-                self.start_recording()
-
-            def on_release(key):
-                if key not in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
-                    return
-                with self._lock:
-                    self._control_down = False
+                    self._hotkey_down = True
                     active = self._recording
+                # F8 is a toggle: one press starts, the next press stops.
                 if active:
                     self.stop_recording()
+                else:
+                    self.start_recording()
+
+            def on_release(key):
+                if key == keyboard.Key.f8:
+                    with self._lock:
+                        self._hotkey_down = False
 
             self._listener = keyboard.Listener(on_press=on_press, on_release=on_release)
             self._listener.daemon = True
             self._listener.start()
         except Exception as exc:
             self.error.emit(
-                "Global Control shortcut unavailable. Grant Accessibility/Input "
+                "Global F8 shortcut unavailable. Grant Accessibility/Input "
                 "Monitoring permission or use the in-app recording button. " + str(exc)
             )
 

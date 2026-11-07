@@ -12,7 +12,7 @@ A local-first macOS desktop copilot for meeting and interview assistance. It cap
 - Microphone capture with selectable input device.
 - macOS system-audio capture through Apple's ScreenCaptureKit.
 - Local transcription with MLX Whisper on Apple Silicon.
-- **Toggle hotkey:** press **Control + Option + Command + R** once to start recording; press it again to stop. No key-holding required.
+- **Toggle hotkey:** press **Control + Option + R** once to start recording; press it again to stop. No key-holding required.
 - Visible Start/Stop button as a fallback.
 - Transcript labels distinguish microphone audio from other participants/system audio.
 - Local transcript refinement and answer generation.
@@ -90,7 +90,7 @@ The audio requirements include:
 | `sounddevice` | Microphone input capture through PortAudio |
 | `soundfile` | Write microphone PCM audio to temporary WAV |
 | `numpy` | Buffer and combine microphone audio frames |
-| `pynput` | Global Control + Option + Command + R keyboard shortcut |
+| `pynput` | Global Control + Option + R keyboard shortcut |
 | `mlx-whisper` | Local Whisper transcription on Apple Silicon |
 | `pyobjc-framework-Cocoa` | macOS window capture privacy API |
 | `PySide6` | Desktop UI and Qt event loop |
@@ -131,15 +131,15 @@ On first transcription, MLX Whisper downloads the configured model from Hugging 
 
 ## 5. Audio recording controls
 
-### Control + Option + Command + R toggle shortcut
+### Control + Option + R toggle shortcut
 
-- Press **Control + Option + Command + R** once: begin microphone + system-audio recording.
-- Press **Control + Option + Command + R** again: stop recording and begin local transcription.
+- Press **Control + Option + R** once: begin microphone + system-audio recording.
+- Press **Control + Option + R** again: stop recording and begin local transcription.
 - You do not need to hold the key.
 - The app shows a recording state and changes the button to **Stop recording** while active.
 - If the global shortcut is unavailable, click the in-app Start/Stop button.
 
-The global shortcut uses `pynput` and the Control + Option + Command + R combination. macOS may require Accessibility and Input Monitoring permissions for the terminal or Python process that launches the app.
+The global shortcut uses `pynput` and the Control + Option + R combination. macOS may require Accessibility and Input Monitoring permissions for the terminal or Python process that launches the app.
 
 ### Microphone selection
 
@@ -147,10 +147,10 @@ Use the Microphone dropdown to select the Mac's built-in microphone, a Bluetooth
 
 ### Audio processing flow
 
-1. Control + Option + Command + R starts a new recording session.
+1. Control + Option + R starts a new recording session.
 2. `sounddevice` captures microphone frames.
 3. The Swift ScreenCaptureKit helper captures system audio.
-4. When Control + Option + Command + R is pressed again, capture stops and both audio tracks are finalized.
+4. When Control + Option + R is pressed again, capture stops and both audio tracks are finalized.
 5. `mlx-whisper` transcribes the microphone and system-audio files locally.
 6. Transcript text is passed to the local Ollama workflow for cleanup/answer generation.
 7. The temporary session directory is deleted after transcription, including when transcription raises an error.
@@ -163,7 +163,7 @@ Grant permissions to the app that launches Python (for example, Terminal or VS C
 
 1. **Microphone:** allows capture of your microphone.
 2. **Screen & System Audio Recording:** allows ScreenCaptureKit to capture Mac system audio.
-3. **Accessibility / Input Monitoring:** may be required for the global Control + Option + Command + R shortcut.
+3. **Accessibility / Input Monitoring:** may be required for the global Control + Option + R shortcut.
 4. Restart the app after changing permissions.
 
 Menu names can vary slightly by macOS version. If system audio does not start, verify Screen & System Audio Recording permission and restart the launching application.
@@ -183,7 +183,7 @@ This is not a universal invisibility or anti-capture feature. Some screen-sharin
 ```text
 .
 ├── audio/
-│   ├── controller.py              # Microphone/system capture lifecycle and Control + Option + Command + R toggle
+│   ├── controller.py              # Microphone/system capture lifecycle and Control + Option + R toggle
 │   ├── macos_system_audio.swift   # ScreenCaptureKit + AVFoundation recorder
 │   ├── transcriber.py             # Local MLX Whisper wrapper
 │   └── README.md                  # Audio subsystem notes
@@ -226,12 +226,12 @@ For a native crash trace:
 python -X faulthandler main.py
 ```
 
-### Control + Option + Command + R does not work
+### Control + Option + R does not work
 
 - Use the in-app recording button to confirm audio capture works independently.
 - Grant Accessibility and Input Monitoring permissions to Terminal/VS Code/Python as applicable.
 - Restart the app after granting permissions.
-- Check that another application or macOS shortcut is not intercepting Control + Option + Command + R.
+- Check that another application or macOS shortcut is not intercepting Control + Option + R.
 
 ### No microphone audio
 

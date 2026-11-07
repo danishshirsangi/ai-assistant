@@ -1,18 +1,43 @@
-# Audio subsystem — planned for Version 0.2
+# Audio subsystem — Version 0.2
 
-The UI and reasoning layers are deliberately separated from audio capture.
-The next milestone will add:
+## Included
+- Global push-to-talk using Control (press to start, release to stop).
+- In-app Start/Stop fallback.
+- Microphone capture via sounddevice, saved as WAV.
+- System audio via Apple's ScreenCaptureKit Swift helper, saved as M4A.
+- Local transcription via MLX Whisper on Apple Silicon.
+- Separate microphone / system-audio labels.
+- Local Ollama transcript cleanup preserving meaningful technical and conversational context.
+- Interview answer generation in the main app and floating overlay.
 
-1. Push-to-talk global hotkey (press starts capture, release stops).
-2. Microphone capture with `sounddevice`.
-3. macOS system-audio capture through ScreenCaptureKit.
-4. Local Whisper transcription.
-5. Context refinement against recent conversation turns.
-6. A consent/recording indicator and explicit stop/cancel controls.
+## Setup
+Install Xcode Command Line Tools:
 
-Microphone and system audio should initially be stored as separate tracks so
-the application can distinguish the user's speech from remote participants.
-ScreenCaptureKit requires macOS screen & system audio recording permission.
-Global shortcuts may require Accessibility/Input Monitoring permission.
-Only record conversations when all applicable participants and workplace
-policies permit it.
+```bash
+xcode-select --install
+```
+
+Install audio dependencies from the project root:
+
+```bash
+pip install -r requirements-audio-macos.txt
+```
+
+The Swift helper is compiled automatically on first recording. Whisper model files
+are downloaded once on first transcription; inference then runs locally.
+
+## macOS permissions
+- Microphone: allow the Python app.
+- Screen & System Audio Recording: allow the terminal/Python app.
+- Accessibility / Input Monitoring: allow the app for the global Control shortcut.
+
+Restart after changing permissions. If the global shortcut is blocked, use the
+visible Start/Stop button.
+
+## Privacy
+Audio is stored in `data/audio_sessions/`, which is ignored by Git. Do not record
+without appropriate participant consent and workplace authorization.
+
+## Current limits
+Transcription begins after recording stops; there are no live streaming captions yet.
+English is the default language. System audio requires macOS 13+.

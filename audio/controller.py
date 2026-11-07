@@ -107,7 +107,7 @@ class AudioController(QObject):
             self._system_path = self.sessions / (stamp + "-system.m4a")
 
             self._mic_stream = sd.InputStream(
-                samplerate=16000, channels=1, dtype="int16",
+                samplerate=48000, channels=1, dtype="int16",
                 callback=self._mic_callback,
             )
             self._mic_stream.start()
@@ -158,7 +158,7 @@ class AudioController(QObject):
             try:
                 sf.write(
                     str(self._mic_path), np.concatenate(self._mic_frames, axis=0),
-                    16000, subtype="PCM_16",
+                    48000, subtype="PCM_16",
                 )
             except Exception as exc:
                 self.error.emit("Could not save microphone audio: " + str(exc))

@@ -1,0 +1,6 @@
+# Optional local audio dependencies for Apple Silicon macOS
+sounddevice>=0.5.1
+soundfile>=0.13.1
+numpy>=1.26
+pynput>=1.7.7
+mlx-whisper>=0.4.2

@@ -4,6 +4,8 @@
 - Global push-to-talk using Control (press to start, release to stop).
 - In-app Start/Stop fallback.
 - Microphone capture via sounddevice, saved as WAV.
+- Microphone selector for macOS default, OnePlus Buds, MacBook built-in mic, or other available input devices.
+- Refresh button to rescan devices after connecting or disconnecting a headset; input selection is locked during recording.
 - System audio via Apple's ScreenCaptureKit Swift helper, saved as M4A.
 - Local transcription via MLX Whisper on Apple Silicon.
 - Separate microphone / system-audio labels.

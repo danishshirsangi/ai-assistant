@@ -97,7 +97,6 @@ class AudioController(QObject):
             modifiers = {
                 keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r,
                 keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r,
-                keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r,
             }
 
             def on_press(key):
@@ -112,14 +111,12 @@ class AudioController(QObject):
                                 (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r))
                         and any(k in self._pressed_modifiers for k in
                                 (keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r))
-                        and any(k in self._pressed_modifiers for k in
-                                (keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r))
                     )
                     if not is_combo or self._hotkey_down:
                         return
                     self._hotkey_down = True
                     active = self._recording
-                # Toggle with Control + Option + Command + R.
+                # Toggle with Control + Option + R.
                 if active:
                     self.stop_recording()
                 else:
@@ -137,7 +134,7 @@ class AudioController(QObject):
             self._listener.start()
         except Exception as exc:
             self.error.emit(
-                "Global F8 shortcut unavailable. Grant Accessibility/Input "
+                "Global recording shortcut unavailable. Grant Accessibility/Input "
                 "Monitoring permission or use the in-app recording button. " + str(exc)
             )
 

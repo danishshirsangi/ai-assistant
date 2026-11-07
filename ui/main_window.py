@@ -9,6 +9,7 @@ from core.resume_rag import ResumeRAG
 from core.answer_generator import AnswerGenerator
 from ui.worker import FunctionWorker
 from ui.floating_overlay import FloatingOverlay
+from ui.macos_window_privacy import set_window_capture_exclusion
 
 
 class MainWindow(QMainWindow):
@@ -23,6 +24,7 @@ class MainWindow(QMainWindow):
         self.generator = AnswerGenerator(self.ollama, self.rag)
         self.history = []
         self.overlay = FloatingOverlay()
+        self._capture_privacy_enabled = True
         self.audio = None
         self._build_ui()
         self._setup_audio()
@@ -52,11 +54,18 @@ class MainWindow(QMainWindow):
         show_overlay.clicked.connect(self.overlay.show)
         clear = QPushButton("Clear conversation")
         clear.clicked.connect(self.clear_chat)
+        self.privacy_button = QPushButton("Capture privacy: ON")
+        self.privacy_button.setToolTip(
+            "Request exclusion of both app windows from compatible macOS capture APIs. "
+            "Meeting-app behaviour varies; this is not a universal guarantee."
+        )
+        self.privacy_button.clicked.connect(self._toggle_capture_privacy)
         toolbar.addWidget(QLabel("Chat model:"))
         toolbar.addWidget(self.model)
         toolbar.addWidget(upload)
         toolbar.addWidget(show_overlay)
         toolbar.addWidget(clear)
+        toolbar.addWidget(self.privacy_button)
         root.addLayout(toolbar)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -106,6 +115,37 @@ class MainWindow(QMainWindow):
         note = QLabel("Local mode · Ollama + SQLite · audio captured and transcribed on this Mac")
         note.setStyleSheet("color: #777; font-size: 11px;")
         root.addWidget(note)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._capture_privacy_enabled:
+            self._apply_capture_privacy()
+
+    def _toggle_capture_privacy(self):
+        self._capture_privacy_enabled = not self._capture_privacy_enabled
+        self._apply_capture_privacy()
+
+    def _apply_capture_privacy(self):
+        enabled = self._capture_privacy_enabled
+        self.privacy_button.setText(
+            "Capture privacy: ON" if enabled else "Capture privacy: OFF"
+        )
+        self.overlay.set_capture_privacy(enabled)
+        ok, detail = set_window_capture_exclusion(self, enabled)
+        if not ok:
+            self.privacy_button.setText(
+                "Capture privacy: ON (unavailable)" if enabled else "Capture privacy: OFF"
+            )
+            self.privacy_button.setToolTip(
+                "Could not apply privacy to the main window: " + detail +
+                "\\nMeeting-app behaviour varies; this is not a universal guarantee."
+            )
+        else:
+            self.privacy_button.setToolTip(
+                "Both app windows are set to " +
+                ("exclude from" if enabled else "allow") +
+                " compatible macOS capture APIs. Meeting-app behaviour varies."
+            )
 
     def _setup_audio(self):
         try:

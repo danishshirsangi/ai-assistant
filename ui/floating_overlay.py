@@ -1,59 +1,119 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QTextBrowser, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextBrowser,
+    QFrame
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCursor
 
 from ui.rich_text import format_response_html
 from ui.macos_window_privacy import set_window_capture_exclusion
 
 
 class FloatingOverlay(QWidget):
+    """Stable-size translucent overlay; answer content scrolls, never resizes it."""
+
     def __init__(self):
         super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
         self.setWindowTitle("Meeting Copilot — Answer")
-        self.setMinimumSize(420, 220)
-        self.resize(540, 300)
-        self.setMouseTracking(False)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self._expanded_size = (540, 300)
+        self._collapsed = False
         self._capture_privacy_enabled = True
+        self.setMinimumSize(420, 220)
+        self.resize(*self._expanded_size)
+
         self.setStyleSheet("""
-            QWidget { background: #17191f; color: #f3f4f6; border: 1px solid #414653; }
-            QLabel { color: #f3f4f6; font-size: 14px; }
-            QPushButton { background: #303642; padding: 7px; border-radius: 5px; }
-            QTextBrowser { background: #17191f; color: #f3f4f6; border: none;
-                           font-size: 14px; padding: 4px; }
+            QFrame#overlayPanel {
+                background-color: rgba(19, 26, 43, 220);
+                border: 1px solid rgba(132, 160, 206, 125);
+                border-radius: 13px;
+            }
+            QLabel { color: #f3f6ff; background: transparent; border: none; }
+            QLabel#overlayHeading { font-size: 15px; font-weight: 700; color: #b8d5ff; }
+            QPushButton {
+                color: #eef5ff; background: rgba(65, 93, 143, 190);
+                border: 1px solid rgba(132, 160, 206, 115);
+                padding: 6px 11px; border-radius: 7px; font-weight: 600;
+            }
+            QPushButton:hover { background: rgba(85, 120, 182, 220); }
+            QTextBrowser {
+                background: rgba(12, 19, 33, 175);
+                color: #f3f6ff; border: 1px solid rgba(108, 139, 190, 75);
+                border-radius: 8px; font-size: 14px; padding: 9px;
+                selection-background-color: #4169a5;
+            }
         """)
-        layout = QVBoxLayout(self)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self.panel = QFrame()
+        self.panel.setObjectName("overlayPanel")
+        outer.addWidget(self.panel)
+
+        layout = QVBoxLayout(self.panel)
         layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(8)
-        self.heading = QLabel("Latest answer")
-        self.heading.setStyleSheet("font-weight: 700; font-size: 16px;")
+
+        self.header = QWidget()
+        header_layout = QHBoxLayout(self.header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        self.heading = QLabel("✦ Latest answer")
+        self.heading.setObjectName("overlayHeading")
+        self.collapse_button = QPushButton("−  Collapse")
+        self.collapse_button.setToolTip("Collapse the answer into a small button")
+        self.collapse_button.clicked.connect(self.toggle_collapsed)
+        header_layout.addWidget(self.heading)
+        header_layout.addStretch()
+        header_layout.addWidget(self.collapse_button)
+
         self.answer = QTextBrowser()
         self.answer.setReadOnly(True)
         self.answer.setOpenExternalLinks(False)
         self.answer.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.answer.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.answer.setMinimumHeight(110)
-        self.answer.setStyleSheet("QTextBrowser { border: none; }")
-        close = QPushButton("Hide overlay")
-        close.clicked.connect(self.hide)
-        layout.addWidget(self.heading)
+
+        self.footer = QWidget()
+        footer_layout = QHBoxLayout(self.footer)
+        footer_layout.setContentsMargins(0, 0, 0, 0)
+        footer_layout.addStretch()
+        hide_button = QPushButton("Hide overlay")
+        hide_button.clicked.connect(self.hide)
+        footer_layout.addWidget(hide_button)
+
+        layout.addWidget(self.header)
         layout.addWidget(self.answer, 1)
-        layout.addWidget(close)
+        layout.addWidget(self.footer)
         self.setCursor(Qt.CursorShape.ArrowCursor)
 
-    def set_answer(self, text):
-        self.answer.setHtml(format_response_html(text))
-        self.answer.document().adjustSize()
-        content_height = int(self.answer.document().size().height()) + 34
-        screen = QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
-        available_height = screen.availableGeometry().height() if screen else 900
-        max_height = max(300, int(available_height * 0.72))
-        desired_height = min(max_height, max(220, content_height + 92))
-        if self.isVisible():
-            self.resize(self.width(), desired_height)
+    def toggle_collapsed(self):
+        if not self._collapsed:
+            self._expanded_size = (self.width(), self.height())
+            self._collapsed = True
+            self.answer.hide()
+            self.footer.hide()
+            self.heading.hide()
+            self.collapse_button.setText("▣  Expand answer")
+            self.collapse_button.setToolTip("Restore the full answer")
+            self.setMinimumSize(0, 0)
+            self.setMaximumSize(220, 48)
+            self.resize(220, 48)
         else:
-            self.resize(max(self.width(), 540), desired_height)
+            self._collapsed = False
+            self.setMaximumSize(16777215, 16777215)
+            self.setMinimumSize(420, 220)
+            self.heading.show()
+            self.answer.show()
+            self.footer.show()
+            self.collapse_button.setText("−  Collapse")
+            self.collapse_button.setToolTip("Collapse the answer into a small button")
+            self.resize(*self._expanded_size)
+
+    def set_answer(self, text):
+        scrollbar = self.answer.verticalScrollBar()
+        was_near_bottom = scrollbar.value() >= scrollbar.maximum() - 24
+        self.answer.setHtml(format_response_html(text))
+        if was_near_bottom:
+            scrollbar.setValue(scrollbar.maximum())
+        # Intentionally do not resize: streaming and long answers stay scrollable.
 
     def set_capture_privacy(self, enabled):
         self._capture_privacy_enabled = bool(enabled)

@@ -4,3 +4,4 @@ soundfile>=0.13.1
 numpy>=1.26
 pynput>=1.7.7
 mlx-whisper>=0.4.2
+pyobjc-framework-Cocoa>=10.0

@@ -104,6 +104,7 @@ class MainWindow(QMainWindow):
             self.audio.recording_changed.connect(self._recording_changed)
             self.audio.transcript_ready.connect(self._audio_transcript_ready)
             self.audio.error.connect(self._audio_error)
+            self.audio.start_hotkey_listener()
             self.audio_hint.setText("Hold Control anywhere to record; release to stop · mic + system audio")
         except Exception as exc:
             self.audio_hint.setText("Audio dependencies unavailable. Install requirements-audio-macos.txt")

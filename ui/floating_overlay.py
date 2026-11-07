@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplication
 from PySide6.QtCore import Qt
+from ctypes import c_void_p
 
 try:
     import AppKit

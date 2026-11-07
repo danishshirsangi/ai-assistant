@@ -1,7 +1,11 @@
+import os
 import select
+import shutil
 import subprocess
 import sys
+import tempfile
 import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -21,7 +25,9 @@ class AudioController(QObject):
     def __init__(self, project_root=None):
         super().__init__()
         self.root = Path(project_root or Path(__file__).resolve().parents[1])
-        self.sessions = self.root / "data" / "audio_sessions"
+        self.temp_root = Path(tempfile.gettempdir())
+        self._cleanup_stale_sessions()
+        self._session_dir = None
         self.binary_dir = self.root / "data" / "bin"
         self.swift_source = self.root / "audio" / "macos_system_audio.swift"
         self._lock = threading.RLock()
@@ -34,6 +40,30 @@ class AudioController(QObject):
         self._listener = None
         self._control_down = False
         self.selected_input_device = None  # None means macOS default input
+
+    def _cleanup_stale_sessions(self):
+        """Remove abandoned temporary audio folders from crashed app processes."""
+        for folder in self.temp_root.glob("interview-copilot-audio-*"):
+            try:
+                owner_pid = int(folder.name.split("-")[3])
+                if owner_pid == os.getpid():
+                    continue
+                try:
+                    os.kill(owner_pid, 0)
+                except ProcessLookupError:
+                    shutil.rmtree(folder, ignore_errors=True)
+                except PermissionError:
+                    continue
+            except (ValueError, IndexError, OSError):
+                continue
+
+    def _remove_session_files(self):
+        folder = self._session_dir
+        self._session_dir = None
+        self._mic_path = None
+        self._system_path = None
+        if folder is not None:
+            shutil.rmtree(folder, ignore_errors=True)
 
     @property
     def is_recording(self):
@@ -117,10 +147,13 @@ class AudioController(QObject):
             self._recording = True
             self._mic_frames = []
         try:
-            self.sessions.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            self._mic_path = self.sessions / (stamp + "-mic.wav")
-            self._system_path = self.sessions / (stamp + "-system.m4a")
+            self._session_dir = Path(tempfile.mkdtemp(
+                prefix=f"interview-copilot-audio-{os.getpid()}-{uuid.uuid4().hex[:8]}-",
+                dir=self.temp_root,
+            ))
+            self._mic_path = self._session_dir / (stamp + "-mic.wav")
+            self._system_path = self._session_dir / (stamp + "-system.m4a")
 
             self._mic_stream = sd.InputStream(
                 device=self.selected_input_device,
@@ -154,6 +187,7 @@ class AudioController(QObject):
             self.recording_changed.emit(True)
         except Exception as exc:
             self._cleanup_capture()
+            self._remove_session_files()
             with self._lock:
                 self._recording = False
             self.error.emit(str(exc))
@@ -240,6 +274,9 @@ class AudioController(QObject):
             self.transcript_ready.emit(transcript)
         except Exception as exc:
             self.error.emit("Local transcription failed: " + str(exc))
+        finally:
+            # Keep captured audio only for the local transcription step.
+            self._remove_session_files()
 
     def toggle_recording(self):
         if self.is_recording:

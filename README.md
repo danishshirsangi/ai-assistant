@@ -1,48 +1,55 @@
-# Interview Copilot — macOS MVP
+# Interview Copilot — macOS local-first assistant
 
 A local-first interview assistant built with Python, PySide6, Ollama and SQLite.
 
-## What works in v0.1
+## v0.1
+- Native desktop chat and always-on-top floating answer window.
+- Local Ollama chat and embeddings.
+- PDF, DOCX, TXT and Markdown resume indexing in SQLite.
+- Resume-aware answers plus general Business/Data Analyst interview reasoning.
+- Recent conversation context and safeguards against inventing personal experience.
 
-- Native desktop chat window.
-- Separate always-on-top floating answer window.
-- Connects to a local Ollama server.
-- Uploads PDF, DOCX, TXT or Markdown resumes.
-- Extracts text, chunks it, embeds it with Ollama and stores vectors in local SQLite.
-- Retrieves relevant resume context for each question.
-- Answers general questions even when they are not covered by the resume.
-- Maintains recent conversation history.
-- Adaptive answer style and safeguards against inventing personal experience.
+## v0.2 audio milestone
+- Hold the **Control** key anywhere to start recording; release it to stop.
+- Captures microphone audio using sounddevice.
+- Captures macOS system audio using Apple's ScreenCaptureKit (macOS 13+).
+- Transcribes both tracks locally using MLX Whisper on Apple Silicon.
+- Keeps microphone and system-audio transcripts separately labelled.
+- Cleans filler/repetition while preserving technical terms, numbers, negations and follow-up references.
+- Generates an answer in the main window and floating overlay.
+- Includes a visible recording state and manual Start/Stop fallback.
 
 ## Requirements
+- macOS 13+ for ScreenCaptureKit system-audio capture.
+- Apple Silicon for the MLX Whisper transcription path.
+- Python 3.10+.
+- Ollama running locally with `qwen3:8b` and `nomic-embed-text`.
+- Xcode Command Line Tools: `xcode-select --install`.
 
-- macOS
-- Python 3.10+
-- Ollama installed and running
-- Models:
-  - `qwen3:8b`
-  - `nomic-embed-text`
-
-Install / prepare Ollama:
+Prepare Ollama:
 
 ```bash
 ollama pull qwen3:8b
 ollama pull nomic-embed-text
-ollama serve
 ```
 
-If Ollama is already running as a macOS app, you usually do not need to run
-`ollama serve` again. Check with `ollama list`.
+## Update an existing clone
 
-## Setup
-
-From this project directory:
+From the existing repository folder:
 
 ```bash
-python3 -m venv venv
+git fetch origin
+git switch -c feature/v0.2-audio-copilot --track origin/feature/v0.2-audio-copilot
+```
+
+If you already created the local branch, use `git pull` after switching to it.
+
+Activate your existing virtual environment and install the audio dependencies:
+
+```bash
 source venv/bin/activate
-python -m pip install --upgrade pip
 pip install -r requirements.txt
+pip install -r requirements-audio-macos.txt
 ```
 
 Run:
@@ -51,32 +58,25 @@ Run:
 python main.py
 ```
 
-## First run
+On first use, MLX Whisper downloads its model files once. Transcription and inference run locally afterwards; audio and transcripts are not sent to a cloud API.
 
-1. Confirm the status says `Ollama connected`.
-2. Click **Upload resume** and select your PDF or DOCX.
-3. Wait for local indexing to finish.
-4. Ask a question such as:
-   - "Walk me through my analytics experience."
-   - "How would you investigate a 10% drop in orders in one city?"
-   - "Explain how campaign uplift analysis works."
-5. Click **Show floating overlay** to open the separate always-on-top answer window.
+## macOS permissions
+1. Allow Microphone access when prompted.
+2. Allow Screen & System Audio Recording for the terminal/Python app running ScreenCaptureKit.
+3. Allow Accessibility (and, if prompted, Input Monitoring) for the global Control shortcut.
+4. Restart the app after changing permissions.
 
-## Local storage
+The app displays a visible recording state. Only record calls when all participants and applicable workplace policies permit it.
 
-- `vector_db/resume_vectors.sqlite3` contains the local SQLite vector index.
-- Your resume is not uploaded to a cloud service by this application.
-- Do not commit `data/`, `vector_db/` or your resume to source control.
+## Local data
+- `vector_db/resume_vectors.sqlite3`: local resume embeddings.
+- `data/audio_sessions/`: local microphone WAV and system-audio M4A recordings.
+- `data/bin/`: locally compiled ScreenCaptureKit helper.
+- These paths are ignored by Git. Do not commit resumes, transcripts or recordings.
 
-## Current limitations
-
-- v0.1 is text-first. It does not yet record microphone or system audio.
-- The floating overlay is a normal visible window, not a stealth/hidden window.
-- No automatic answer generation from live calls yet.
-- The initial build uses synchronous Ollama HTTP calls in background workers.
-- Resume extraction is text-based; scanned PDFs may need OCR in a later version.
-
-## Next milestone: audio
-
-See `audio/README.md`. We will add push-to-talk, local Whisper transcription,
-macOS ScreenCaptureKit system audio capture and a context-refinement stage.
+## Known limitations
+- Transcription begins after releasing Control; this is not live streaming.
+- English is the default Whisper language.
+- System audio capture requires macOS 13+ and Screen & System Audio Recording permission.
+- Global Control may require Accessibility/Input Monitoring permission.
+- Scanned PDF OCR and configurable shortcuts are future improvements.

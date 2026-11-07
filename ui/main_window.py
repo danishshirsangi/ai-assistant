@@ -1,9 +1,10 @@
 from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QFileDialog, QMessageBox, QComboBox, QSplitter
+    QTextEdit, QLineEdit, QFileDialog, QMessageBox, QComboBox, QSplitter, QToolTip
 )
 from PySide6.QtCore import Qt, QThreadPool
+from PySide6.QtGui import QIcon
 from core.ollama_client import OllamaClient
 from core.resume_rag import ResumeRAG
 from core.answer_generator import AnswerGenerator
@@ -16,6 +17,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Interview Copilot")
+        self.setWindowIcon(QIcon(str(Path(__file__).resolve().parents[1] / "assets" / "interview-copilot.svg")))
         self.resize(1050, 760)
         self.setMinimumSize(760, 560)
         self.pool = QThreadPool.globalInstance()
@@ -76,7 +78,7 @@ class MainWindow(QMainWindow):
         self.transcript = QTextEdit()
         self.transcript.setReadOnly(True)
         self.transcript.setMaximumHeight(125)
-        self.transcript.setPlaceholderText("Live transcript will appear here after push-to-talk.")
+        self.transcript.setPlaceholderText("Transcript appears here after you stop recording.")
         splitter.addWidget(self.chat)
         splitter.addWidget(self.transcript)
         splitter.setSizes([530, 125])
@@ -84,7 +86,7 @@ class MainWindow(QMainWindow):
 
         audio_bar = QHBoxLayout()
         self.record_button = QPushButton("Start recording")
-        self.record_button.setToolTip("Hold Control anywhere to record; release to stop.")
+        self.record_button.setToolTip("Press F8 once to start recording; press F8 again to stop. You can also use this button.")
         self.record_button.clicked.connect(self._toggle_recording)
         self.microphone = QComboBox()
         self.microphone.setMinimumWidth(210)
@@ -157,7 +159,7 @@ class MainWindow(QMainWindow):
             self.microphone.currentIndexChanged.connect(self._microphone_changed)
             self._refresh_microphones()
             self.audio.start_hotkey_listener()
-            self.audio_hint.setText("Hold Control anywhere to record; release to stop · local audio only")
+            self.audio_hint.setText("Press F8 to start · press F8 again to stop · local audio only")
         except Exception as exc:
             self.audio_hint.setText("Audio dependencies unavailable. Install requirements-audio-macos.txt")
             self.record_button.setEnabled(False)
@@ -273,6 +275,7 @@ class MainWindow(QMainWindow):
 
     def _recording_changed(self, active):
         self.record_button.setText("Stop recording" if active else "Start recording")
+        self.audio_hint.setText("Recording… press F8 again to stop" if active else "Transcribing locally…")
         self.microphone.setEnabled(not active)
         self.refresh_microphones_button.setEnabled(not active)
         self.status.setText("Recording mic + system audio…" if active else "Transcribing locally…")

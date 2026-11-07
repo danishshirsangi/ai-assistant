@@ -33,11 +33,28 @@ class AudioController(QObject):
         self._system_path = None
         self._listener = None
         self._control_down = False
+        self.selected_input_device = None  # None means macOS default input
 
     @property
     def is_recording(self):
         with self._lock:
             return self._recording
+
+    def list_input_devices(self):
+        """Return available input devices as (index, name, is_default) tuples."""
+        devices = sd.query_devices()
+        default_input = sd.default.device[0]
+        available = []
+        for index, device in enumerate(devices):
+            if int(device.get("max_input_channels", 0)) > 0:
+                available.append((index, device["name"], index == default_input))
+        return available
+
+    def set_input_device(self, device_index=None):
+        """Select an input device; None delegates selection to macOS."""
+        if self.is_recording:
+            raise RuntimeError("Stop recording before changing the microphone.")
+        self.selected_input_device = device_index
 
     def start_hotkey_listener(self):
         if sys.platform != "darwin":
@@ -106,6 +123,7 @@ class AudioController(QObject):
             self._system_path = self.sessions / (stamp + "-system.m4a")
 
             self._mic_stream = sd.InputStream(
+                device=self.selected_input_device,
                 samplerate=48000, channels=1, dtype="int16",
                 callback=self._mic_callback,
             )

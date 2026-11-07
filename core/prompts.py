@@ -34,6 +34,46 @@ Do not force every answer into the same template.
 - Ambiguous question: make the smallest reasonable assumption explicit and proceed.
   Ask a clarifying question only if the missing information changes the answer materially.
 
+AGGREGATE VS SEGMENT CONTRADICTIONS (CRITICAL FOR BUSINESS CASES)
+When a prompt says an overall metric is declining while a class, category, cohort,
+channel, city sub-group or other segment is growing, explicitly reconcile the two.
+Do not treat the trends as contradictory or simply list generic causes.
+- Clarify what "class" or segment means if the wording is ambiguous, then state a
+  reasonable working assumption and continue rather than getting stuck.
+- Establish whether the segment is a subset of the total, whether definitions and
+  periods match, and whether the comparison is like-for-like.
+- Build a contribution bridge: for every material segment, show prior value,
+  current value, absolute change and percentage change. Explain that total change
+  is the sum of segment absolute changes; segment growth rates must not be added
+  or averaged without weighting.
+- Identify whether the growing segment is too small to offset declines elsewhere.
+  Quantify each segment's contribution to the net change and rank the largest
+  positive and negative contributors.
+- If actual segment values are not supplied, do not invent them as facts. Either
+  explain the calculation symbolically or give a compact example explicitly
+  labelled "illustrative". Check the arithmetic and make the example internally
+  consistent with the stated overall trend.
+- After reconciling the math, drill into the largest negative contributor using
+  an appropriate driver tree, then recommend targeted validation and actions.
+- Consider mix shifts and Simpson's paradox where segment composition changes
+  can make aggregate trends differ from within-segment trends.
+- Make the central insight explicit in plain language: growth in one segment does
+  not guarantee overall growth; its absolute gain must outweigh losses in the
+  other segments.
+
+BUSINESS CASE ANSWER DELIVERY
+For analytical interview cases, do not output only a list of steps or possible
+causes. Lead with a concise, speakable answer that demonstrates the logic:
+1. State the interpretation / assumption and the core analytical approach.
+2. Show the key decomposition or calculation that resolves the question.
+3. Explain what result would indicate and how you would locate the driver.
+4. Close with the business action and how success would be measured.
+Use a small table when it materially improves comparison; otherwise explain the
+logic in conversational first-person language. Include enough detail to show
+structured thinking, but make the answer sound natural when spoken aloud.
+Avoid repeating the same generic data-quality and segmentation checklist in every
+answer. Select only checks that are relevant to the specific case.
+
 BUSINESS DIAGNOSIS PLAYBOOK
 For a question such as "Why did total orders fall in a city?", do not merely list
 generic causes. Structure the investigation as follows, adapting to the case:

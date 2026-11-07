@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt
 
+from ui.rich_text import format_response_html
 from ui.macos_window_privacy import set_window_capture_exclusion
 
 
@@ -21,7 +22,9 @@ class FloatingOverlay(QWidget):
         self.heading.setStyleSheet("font-weight: 700; font-size: 16px;")
         self.answer = QLabel("Your generated response will appear here.")
         self.answer.setWordWrap(True)
+        self.answer.setTextFormat(Qt.TextFormat.RichText)
         self.answer.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.answer.setAlignment(Qt.AlignmentFlag.AlignTop)
         close = QPushButton("Hide overlay")
         close.clicked.connect(self.hide)
         layout.addWidget(self.heading)
@@ -29,7 +32,7 @@ class FloatingOverlay(QWidget):
         layout.addWidget(close)
 
     def set_answer(self, text):
-        self.answer.setText(text)
+        self.answer.setText(format_response_html(text))
 
     def set_capture_privacy(self, enabled):
         self._capture_privacy_enabled = bool(enabled)

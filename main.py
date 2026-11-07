@@ -7,6 +7,12 @@ from ui.main_window import MainWindow
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Interview Copilot")
+    # Run as a macOS accessory app: no Dock icon or normal Cmd-Tab entry.
+    try:
+        from AppKit import NSApp, NSApplicationActivationPolicyAccessory
+        NSApp.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+    except ImportError:
+        pass
     app.setWindowIcon(QIcon(str(Path(__file__).resolve().parent / "assets" / "interview-copilot.svg")))
     window = MainWindow()
     window.show()

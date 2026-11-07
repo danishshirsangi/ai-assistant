@@ -122,7 +122,15 @@ class AudioController(QObject):
                 raise RuntimeError("Timed out starting ScreenCaptureKit system audio.")
             line = self._system_process.stdout.readline().strip()
             if line != "READY":
-                detail = line or "The helper exited before capture started."
+                process = self._system_process
+                return_code = process.poll()
+                stderr_text = ""
+                if return_code is not None and process.stderr:
+                    stderr_text = process.stderr.read().strip()
+                detail = line or stderr_text or (
+                    "The helper exited before capture started"
+                    + (f" (exit code {return_code})" if return_code is not None else ".")
+                )
                 raise RuntimeError("System audio did not start: " + detail)
 
             self.recording_changed.emit(True)
@@ -166,18 +174,33 @@ class AudioController(QObject):
         process = self._system_process
         self._system_process = None
         if process is not None:
-            try:
-                if process.stdin:
-                    process.stdin.write("\n")
+            if process.poll() is None and process.stdin:
+                try:
+                    process.stdin.write("\\n")
                     process.stdin.flush()
-                    process.stdin.close()
+                except (BrokenPipeError, OSError):
+                    pass
+                finally:
+                    try:
+                        process.stdin.close()
+                    except (BrokenPipeError, OSError):
+                        pass
+            try:
                 process.wait(timeout=25)
-            except Exception:
+            except subprocess.TimeoutExpired:
                 process.terminate()
                 try:
                     process.wait(timeout=5)
-                except Exception:
+                except subprocess.TimeoutExpired:
                     process.kill()
+                    process.wait(timeout=5)
+            finally:
+                for pipe in (process.stdin, process.stdout, process.stderr):
+                    if pipe is not None:
+                        try:
+                            pipe.close()
+                        except (BrokenPipeError, OSError):
+                            pass
 
     def _transcribe(self):
         try:

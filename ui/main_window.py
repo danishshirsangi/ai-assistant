@@ -77,9 +77,19 @@ class MainWindow(QMainWindow):
         self.record_button = QPushButton("Start recording")
         self.record_button.setToolTip("Hold Control anywhere to record; release to stop.")
         self.record_button.clicked.connect(self._toggle_recording)
-        self.audio_hint = QLabel("Hold Control to talk · mic + system audio · local transcription")
+        self.microphone = QComboBox()
+        self.microphone.setMinimumWidth(210)
+        self.microphone.setToolTip("Choose the microphone used for your voice.")
+        self.microphone.addItem("System default (macOS)", None)
+        self.refresh_microphones_button = QPushButton("Refresh")
+        self.refresh_microphones_button.setToolTip("Refresh available microphones.")
+        self.refresh_microphones_button.clicked.connect(self._refresh_microphones)
+        self.audio_hint = QLabel("Mic + system audio · local transcription")
         self.audio_hint.setStyleSheet("color: #777; font-size: 11px;")
         audio_bar.addWidget(self.record_button)
+        audio_bar.addWidget(QLabel("Microphone:"))
+        audio_bar.addWidget(self.microphone)
+        audio_bar.addWidget(self.refresh_microphones_button)
         audio_bar.addWidget(self.audio_hint, 1)
         root.addLayout(audio_bar)
 
@@ -104,12 +114,43 @@ class MainWindow(QMainWindow):
             self.audio.recording_changed.connect(self._recording_changed)
             self.audio.transcript_ready.connect(self._audio_transcript_ready)
             self.audio.error.connect(self._audio_error)
+            self.microphone.currentIndexChanged.connect(self._microphone_changed)
+            self._refresh_microphones()
             self.audio.start_hotkey_listener()
-            self.audio_hint.setText("Hold Control anywhere to record; release to stop · mic + system audio")
+            self.audio_hint.setText("Hold Control anywhere to record; release to stop · local audio only")
         except Exception as exc:
             self.audio_hint.setText("Audio dependencies unavailable. Install requirements-audio-macos.txt")
             self.record_button.setEnabled(False)
             self.status.setToolTip(str(exc))
+
+    def _refresh_microphones(self):
+        if self.audio is None:
+            return
+        try:
+            selected = self.microphone.currentData()
+            self.microphone.blockSignals(True)
+            self.microphone.clear()
+            self.microphone.addItem("System default (macOS)", None)
+            for index, name, is_default in self.audio.list_input_devices():
+                label = name + (" · macOS default" if is_default else "")
+                self.microphone.addItem(label, index)
+            target = self.microphone.findData(selected)
+            self.microphone.setCurrentIndex(target if target >= 0 else 0)
+            self.microphone.blockSignals(False)
+            self.audio.set_input_device(self.microphone.currentData())
+        except Exception as exc:
+            self.microphone.blockSignals(False)
+            self.audio_hint.setText("Could not list microphones: " + str(exc))
+
+    def _microphone_changed(self, _index):
+        if self.audio is None:
+            return
+        try:
+            self.audio.set_input_device(self.microphone.currentData())
+            name = self.microphone.currentText()
+            self.audio_hint.setText("Microphone: " + name)
+        except Exception as exc:
+            self.audio_hint.setText("Microphone selection failed: " + str(exc))
 
     def _check_server(self):
         worker = FunctionWorker(self.ollama.health)
@@ -192,6 +233,8 @@ class MainWindow(QMainWindow):
 
     def _recording_changed(self, active):
         self.record_button.setText("Stop recording" if active else "Start recording")
+        self.microphone.setEnabled(not active)
+        self.refresh_microphones_button.setEnabled(not active)
         self.status.setText("Recording mic + system audio…" if active else "Transcribing locally…")
 
     def _toggle_recording(self):

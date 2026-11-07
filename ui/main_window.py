@@ -10,6 +10,7 @@ from core.resume_rag import ResumeRAG
 from core.answer_generator import AnswerGenerator
 from ui.worker import FunctionWorker
 from ui.floating_overlay import FloatingOverlay
+from ui.rich_text import format_response_html
 from ui.macos_window_privacy import set_window_capture_exclusion
 
 
@@ -313,11 +314,10 @@ class MainWindow(QMainWindow):
             self.overlay.raise_()
 
     def _append(self, speaker, text):
-        safe = (
-            text.replace("&", "&amp;").replace("<", "&lt;")
-            .replace(">", "&gt;").replace("\n", "<br>")
+        self.chat.append(
+            f"<p style='margin:12px 0 4px 0'><b>{speaker}</b></p>"
+            + format_response_html(text)
         )
-        self.chat.append(f"<p><b>{speaker}</b><br>{safe}</p>")
 
     def _show_error(self, error):
         self.ask_button.setEnabled(True)

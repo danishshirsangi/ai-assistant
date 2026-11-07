@@ -39,6 +39,7 @@ class AudioController(QObject):
         self._system_path = None
         self._listener = None
         self._hotkey_down = False
+        self._pressed_modifiers = set()
         self.selected_input_device = None  # None means macOS default input
 
     def _cleanup_stale_sessions(self):
@@ -93,23 +94,42 @@ class AudioController(QObject):
         try:
             from pynput import keyboard
 
+            modifiers = {
+                keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r,
+                keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r,
+                keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r,
+            }
+
             def on_press(key):
-                if key != keyboard.Key.f8:
-                    return
                 with self._lock:
-                    if self._hotkey_down:
+                    if key in modifiers:
+                        self._pressed_modifiers.add(key)
+                    is_combo = (
+                        isinstance(key, keyboard.KeyCode)
+                        and key.char is not None
+                        and key.char.lower() == "r"
+                        and any(k in self._pressed_modifiers for k in
+                                (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r))
+                        and any(k in self._pressed_modifiers for k in
+                                (keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r))
+                        and any(k in self._pressed_modifiers for k in
+                                (keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r))
+                    )
+                    if not is_combo or self._hotkey_down:
                         return
                     self._hotkey_down = True
                     active = self._recording
-                # F8 is a toggle: one press starts, the next press stops.
+                # Toggle with Control + Option + Command + R.
                 if active:
                     self.stop_recording()
                 else:
                     self.start_recording()
 
             def on_release(key):
-                if key == keyboard.Key.f8:
-                    with self._lock:
+                with self._lock:
+                    if key in modifiers:
+                        self._pressed_modifiers.discard(key)
+                    if isinstance(key, keyboard.KeyCode) and key.char and key.char.lower() == "r":
                         self._hotkey_down = False
 
             self._listener = keyboard.Listener(on_press=on_press, on_release=on_release)

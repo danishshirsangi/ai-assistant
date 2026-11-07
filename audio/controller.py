@@ -84,7 +84,7 @@ class AudioController(QObject):
             return binary
         try:
             result = subprocess.run(
-                ["swiftc", str(self.swift_source), "-o", str(binary)],
+                ["swiftc", "-parse-as-library", str(self.swift_source), "-o", str(binary)],
                 capture_output=True, text=True, timeout=120,
             )
         except FileNotFoundError as exc:

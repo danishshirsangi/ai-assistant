@@ -33,14 +33,13 @@ class AudioController(QObject):
         self._system_path = None
         self._listener = None
         self._control_down = False
-        self._start_hotkey_listener()
 
     @property
     def is_recording(self):
         with self._lock:
             return self._recording
 
-    def _start_hotkey_listener(self):
+    def start_hotkey_listener(self):
         if sys.platform != "darwin":
             self.error.emit("Audio capture is currently supported on macOS only.")
             return

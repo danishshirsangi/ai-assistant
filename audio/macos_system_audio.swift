@@ -38,6 +38,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         config.width = 2
         config.height = 2
         config.capturesAudio = true
+        config.capturesVideo = false
         config.sampleRate = 16000
         config.channelCount = 1
         config.excludesCurrentProcessAudio = true

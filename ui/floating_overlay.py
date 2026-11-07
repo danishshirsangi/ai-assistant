@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
     QFrame
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QTextCursor
 
 from ui.rich_text import format_response_html
 from ui.macos_window_privacy import set_window_capture_exclusion
@@ -108,11 +109,15 @@ class FloatingOverlay(QWidget):
             self.resize(*self._expanded_size)
 
     def set_answer(self, text):
-        scrollbar = self.answer.verticalScrollBar()
-        was_near_bottom = scrollbar.value() >= scrollbar.maximum() - 24
         self.answer.setHtml(format_response_html(text))
-        if was_near_bottom:
-            scrollbar.setValue(scrollbar.maximum())
+        # Keep the beginning of the answer anchored during streaming; the user
+        # can scroll down manually whenever they want to read newer content.
+        cursor = self.answer.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+        self.answer.setTextCursor(cursor)
+        self.answer.verticalScrollBar().setValue(
+            self.answer.verticalScrollBar().minimum()
+        )
         # Intentionally do not resize: streaming and long answers stay scrollable.
 
     def set_capture_privacy(self, enabled):

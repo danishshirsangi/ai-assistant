@@ -1,18 +1,76 @@
-# Audio subsystem — planned for Version 0.2
+# Audio subsystem
 
-The UI and reasoning layers are deliberately separated from audio capture.
-The next milestone will add:
+The audio subsystem captures the user's microphone and Mac system audio, transcribes both tracks locally, and passes transcript text to the app's local answer-generation workflow.
 
-1. Push-to-talk global hotkey (press starts capture, release stops).
-2. Microphone capture with `sounddevice`.
-3. macOS system-audio capture through ScreenCaptureKit.
-4. Local Whisper transcription.
-5. Context refinement against recent conversation turns.
-6. A consent/recording indicator and explicit stop/cancel controls.
+## Controls
 
-Microphone and system audio should initially be stored as separate tracks so
-the application can distinguish the user's speech from remote participants.
-ScreenCaptureKit requires macOS screen & system audio recording permission.
-Global shortcuts may require Accessibility/Input Monitoring permission.
-Only record conversations when all applicable participants and workplace
-policies permit it.
+- **Control + Option + R press:** start recording.
+- **Control + Option + R press again:** stop recording and begin transcription.
+- Holding Control + Option + R is not required.
+- The in-app Start/Stop button is the fallback.
+- The microphone dropdown selects the input device; Refresh rescans devices. Device selection is locked during recording.
+
+## Components
+
+| Component | Responsibility |
+|---|---|
+| `controller.py` | Control + Option + R toggle, microphone capture, Swift helper lifecycle, temporary-file cleanup |
+| `macos_system_audio.swift` | ScreenCaptureKit system audio capture and AVFoundation M4A writer |
+| `transcriber.py` | MLX Whisper local transcription |
+
+## Install
+
+From the repository root with the Python 3.12 virtual environment active:
+
+```bash
+xcode-select --install
+python -m pip install -r requirements-audio-macos.txt
+```
+
+The app compiles the Swift helper automatically on the first recording. MLX Whisper downloads its model on first transcription.
+
+### Dependencies
+
+- `sounddevice`: microphone capture via PortAudio.
+- `soundfile`: temporary WAV output for microphone audio.
+- `numpy`: audio frame buffering/concatenation.
+- `pynput`: global Control + Option + R keyboard listener.
+- `mlx-whisper`: local Apple Silicon Whisper inference.
+- `pyobjc-framework-Cocoa`: macOS capture-privacy window API.
+- Xcode Command Line Tools: `swiftc` compiler and macOS SDK for the ScreenCaptureKit helper.
+
+**FFmpeg is optional, not an app dependency.** The current app writes WAV using SoundFile and M4A using AVFoundation; Whisper reads these files directly. Install FFmpeg only for manual conversion or audio diagnostics: `brew install ffmpeg`.
+
+## Capture and transcription lifecycle
+
+1. Control + Option + R starts a new unique temporary session.
+2. Microphone frames are buffered by sounddevice.
+3. ScreenCaptureKit writes system audio to M4A.
+4. The second Control + Option + R press stops capture and finalizes both tracks.
+5. MLX Whisper transcribes each track locally.
+6. The temporary session directory is removed in a `finally` block, even if transcription fails.
+7. A new Control + Option + R press creates a separate fresh session.
+
+Audio is temporarily written under the operating system's temp directory; it is not retained in the repository's `data/` directory. Startup cleanup attempts to remove stale folders belonging to processes that are no longer running.
+
+## Permissions
+
+Grant the launching app (Terminal, VS Code, etc.):
+
+- Microphone
+- Screen & System Audio Recording
+- Accessibility / Input Monitoring for the global Control + Option + R shortcut
+
+Restart the launching app after changing permissions. macOS permission labels vary by version.
+
+## Troubleshooting
+
+- **Control + Option + R unavailable:** grant Accessibility/Input Monitoring or use the in-app button.
+- **Mic unavailable:** grant Microphone access and select/refresh the correct input device.
+- **System audio unavailable:** macOS 13+, Screen & System Audio Recording permission and Xcode Command Line Tools are required.
+- **Native segmentation fault:** use a clean Python 3.12 environment and reinstall both requirements files; native packages may crash without a Python traceback.
+- **Whisper first run:** model download requires internet; later inference runs locally.
+
+## Privacy
+
+Only record with required participant consent and workplace authorization. Temporary-file cleanup is not secure erasure and should not be treated as a guarantee against forensic recovery.

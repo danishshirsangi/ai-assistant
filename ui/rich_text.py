@@ -142,7 +142,7 @@ def _inline_plain(source):
     rendered = re.sub(r"~~(.+?)~~", r"<s>\1</s>", rendered)
     rendered = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<i>\1</i>", rendered)
 
-    rendered = re.sub(r"(?<!\\w)_([^_\\n]+)_(?!\\w)", r"<i>\\1</i>", rendered)
+    rendered = re.sub(r"(?<!\w)_([^_\n]+)_(?!\w)", r"<i>\1</i>", rendered)
 
     for key, value in placeholders.items():
         rendered = rendered.replace(html.escape(key), value)

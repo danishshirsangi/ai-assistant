@@ -78,8 +78,11 @@ class MainWindow(QMainWindow):
         self.model.addItems(["qwen3:8b"])
         upload = QPushButton("Upload resume")
         upload.clicked.connect(self.upload_resume)
-        show_overlay = QPushButton("Show floating overlay")
-        show_overlay.clicked.connect(self.overlay.show)
+        toggle_overlay = QPushButton("Toggle overlay (⌃⌥H)")
+        toggle_overlay.setToolTip(
+            "Hide or restore the floating overlay. Recording and transcription continue while hidden."
+        )
+        toggle_overlay.clicked.connect(self._toggle_overlay_visibility)
         clear = QPushButton("Clear conversation")
         clear.clicked.connect(self.clear_chat)
         self.privacy_button = QPushButton("Capture privacy: ON")
@@ -91,7 +94,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(QLabel("Chat model:"))
         toolbar.addWidget(self.model)
         toolbar.addWidget(upload)
-        toolbar.addWidget(show_overlay)
+        toolbar.addWidget(toggle_overlay)
         toolbar.addWidget(clear)
         toolbar.addWidget(self.privacy_button)
         root.addLayout(toolbar)
@@ -181,11 +184,12 @@ class MainWindow(QMainWindow):
             self.audio = AudioController()
             self.audio.recording_changed.connect(self._recording_changed)
             self.audio.transcript_ready.connect(self._audio_transcript_ready)
+            self.audio.overlay_toggle_requested.connect(self._toggle_overlay_visibility)
             self.audio.error.connect(self._audio_error)
             self.microphone.currentIndexChanged.connect(self._microphone_changed)
             self._refresh_microphones()
             self.audio.start_hotkey_listener()
-            self.audio_hint.setText("⌃⌥R to start · press again to stop · local audio only")
+            self.audio_hint.setText("⌃⌥R record · ⌃⌥H hide/show overlay · local audio only")
         except Exception as exc:
             self.audio_hint.setText("Audio dependencies unavailable. Install requirements-audio-macos.txt")
             self.record_button.setEnabled(False)
@@ -320,6 +324,13 @@ class MainWindow(QMainWindow):
     def _toggle_recording(self):
         if self.audio is not None:
             self.audio.toggle_recording()
+
+    def _toggle_overlay_visibility(self):
+        """Hide/show only the floating answer window; audio work remains untouched."""
+        if self.overlay.isVisible():
+            self.overlay.hide()
+        else:
+            self.overlay.show()
 
     def _audio_error(self, message):
         self.status.setText("Audio error")

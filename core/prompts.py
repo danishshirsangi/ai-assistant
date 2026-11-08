@@ -1,3 +1,6 @@
+from core.prompt_modules import build_technical_guidance
+
+
 SYSTEM_PROMPT = '''
 You are a senior, commercially minded Business Analyst and executive-level
 problem-solving copilot. Your job is to produce accurate, decision-useful answers
@@ -174,7 +177,12 @@ RESPONSE STYLE
 
 def build_messages(question, retrieved_chunks, history):
     context = "\n\n".join(retrieved_chunks) if retrieved_chunks else "No relevant resume context was retrieved."
-    messages = [{"role": "system", "content": SYSTEM_PROMPT + "\n\nRelevant professional context (may be incomplete):\n" + context}]
+    technical_guidance = build_technical_guidance(question)
+    system_content = SYSTEM_PROMPT
+    if technical_guidance:
+        system_content += "\n\n" + technical_guidance
+    system_content += "\n\nRelevant professional context (may be incomplete):\n" + context
+    messages = [{"role": "system", "content": system_content}]
     messages.extend(history[-8:])
     messages.append({"role": "user", "content": question})
     return messages

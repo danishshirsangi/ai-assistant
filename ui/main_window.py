@@ -4,12 +4,11 @@ from PySide6.QtWidgets import (
     QTextEdit, QLineEdit, QFileDialog, QMessageBox, QComboBox, QSplitter
 )
 from PySide6.QtCore import Qt, QThreadPool
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QTextCursor
 from core.ollama_client import OllamaClient
 from core.resume_rag import ResumeRAG
 from core.answer_generator import AnswerGenerator
 from ui.worker import FunctionWorker
-from ui.floating_overlay import FloatingOverlay
 from ui.rich_text import format_response_html
 from ui.macos_window_privacy import set_window_capture_exclusion
 
@@ -19,6 +18,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Interview Copilot")
         self.setWindowIcon(QIcon(str(Path(__file__).resolve().parents[1] / "assets" / "interview-copilot.svg")))
+        # Keep the single main application window above other app windows.
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.resize(1050, 760)
         self.setMinimumSize(760, 560)
         self.setStyleSheet("""
@@ -51,7 +52,7 @@ class MainWindow(QMainWindow):
         self.rag = ResumeRAG(self.ollama)
         self.generator = AnswerGenerator(self.ollama, self.rag)
         self.history = []
-        self.overlay = FloatingOverlay()
+        self._streamed_answer = ""
         self._capture_privacy_enabled = True
         self.audio = None
         self._build_ui()
@@ -78,20 +79,17 @@ class MainWindow(QMainWindow):
         self.model.addItems(["qwen3:8b"])
         upload = QPushButton("Upload resume")
         upload.clicked.connect(self.upload_resume)
-        show_overlay = QPushButton("Show floating overlay")
-        show_overlay.clicked.connect(self.overlay.show)
         clear = QPushButton("Clear conversation")
         clear.clicked.connect(self.clear_chat)
         self.privacy_button = QPushButton("Capture privacy: ON")
         self.privacy_button.setToolTip(
-            "Request exclusion of both app windows from compatible macOS capture APIs. "
-            "Meeting-app behaviour varies; this is not a universal guarantee."
+            "Request exclusion of the main Interview Copilot window from compatible macOS capture APIs. "
+            "This is best-effort and not a universal screen-sharing guarantee."
         )
         self.privacy_button.clicked.connect(self._toggle_capture_privacy)
         toolbar.addWidget(QLabel("Chat model:"))
         toolbar.addWidget(self.model)
         toolbar.addWidget(upload)
-        toolbar.addWidget(show_overlay)
         toolbar.addWidget(clear)
         toolbar.addWidget(self.privacy_button)
         root.addLayout(toolbar)
@@ -105,9 +103,18 @@ class MainWindow(QMainWindow):
         self.transcript.setReadOnly(True)
         self.transcript.setMaximumHeight(125)
         self.transcript.setPlaceholderText("Transcript appears here after you stop recording.")
+        self.answer_view = QTextEdit()
+        self.answer_view.setReadOnly(True)
+        self.answer_view.setPlaceholderText(
+            "The latest answer will appear here and stream live while the model generates it."
+        )
+        self.answer_view.setStyleSheet("font-size: 15px; padding: 10px;")
+        self.answer_view.setMinimumHeight(150)
+
         splitter.addWidget(self.chat)
+        splitter.addWidget(self.answer_view)
         splitter.addWidget(self.transcript)
-        splitter.setSizes([530, 125])
+        splitter.setSizes([330, 300, 110])
         root.addWidget(splitter, 1)
 
         audio_bar = QHBoxLayout()
@@ -158,7 +165,6 @@ class MainWindow(QMainWindow):
         self.privacy_button.setText(
             "Capture privacy: ON" if enabled else "Capture privacy: OFF"
         )
-        self.overlay.set_capture_privacy(enabled)
         ok, detail = set_window_capture_exclusion(self, enabled)
         if not ok:
             self.privacy_button.setText(
@@ -170,7 +176,7 @@ class MainWindow(QMainWindow):
             )
         else:
             self.privacy_button.setToolTip(
-                "Both app windows are set to " +
+                "The main window is set to " +
                 ("exclude from" if enabled else "allow") +
                 " compatible macOS capture APIs. Meeting-app behaviour varies."
             )
@@ -268,7 +274,14 @@ class MainWindow(QMainWindow):
         self._append("You", question)
         self.ask_button.setEnabled(False)
         self.status.setText("Thinking…")
-        worker = FunctionWorker(self.generator.answer, question, list(self.history))
+        self._begin_answer_stream()
+        worker = FunctionWorker(
+            self.generator.answer,
+            question,
+            list(self.history),
+            with_progress=True,
+        )
+        worker.signals.progress.connect(self._answer_progress)
         worker.signals.result.connect(lambda answer: self._answer_done(question, answer))
         worker.signals.error.connect(self._show_error)
         self.pool.start(worker)
@@ -278,8 +291,7 @@ class MainWindow(QMainWindow):
         self._append("Live transcript", transcript)
         self.status.setText("Finding relevant context…")
         self.ask_button.setEnabled(False)
-        self._streamed_answer = ""
-        self.overlay.set_answer("Generating answer…")
+        self._begin_answer_stream()
         worker = FunctionWorker(
             self.generator.answer_from_transcript,
             transcript,
@@ -291,10 +303,21 @@ class MainWindow(QMainWindow):
         worker.signals.error.connect(self._show_error)
         self.pool.start(worker)
 
-    def _audio_answer_progress(self, token):
+    def _answer_progress(self, token):
         self._streamed_answer += token
-        self.overlay.set_answer(self._streamed_answer)
+        self.answer_view.setPlainText(self._streamed_answer)
+        cursor = self.answer_view.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.answer_view.setTextCursor(cursor)
+        self.answer_view.ensureCursorVisible()
         self.status.setText("Generating answer…")
+
+    def _audio_answer_progress(self, token):
+        self._answer_progress(token)
+
+    def _begin_answer_stream(self):
+        self._streamed_answer = ""
+        self.answer_view.setPlainText("Generating answer…")
 
     def _audio_answer_done(self, result):
         transcript, answer = result
@@ -304,11 +327,9 @@ class MainWindow(QMainWindow):
             {"role": "user", "content": "Live interview transcript:\\n" + transcript},
             {"role": "assistant", "content": answer},
         ])
-        self.overlay.set_answer(answer)
+        self._finish_answer_stream(answer)
         self.ask_button.setEnabled(True)
         self.status.setText("Ready")
-        if self.overlay.isVisible():
-            self.overlay.raise_()
 
     def _recording_changed(self, active):
         self.record_button.setText("Stop recording" if active else "Start recording")
@@ -332,11 +353,15 @@ class MainWindow(QMainWindow):
             {"role": "user", "content": question},
             {"role": "assistant", "content": answer},
         ])
-        self.overlay.set_answer(answer)
+        self._finish_answer_stream(answer)
         self.ask_button.setEnabled(True)
         self.status.setText("Ready")
-        if self.overlay.isVisible():
-            self.overlay.raise_()
+
+    def _finish_answer_stream(self, answer):
+        self.answer_view.setHtml(format_response_html(answer))
+        self.answer_view.verticalScrollBar().setValue(
+            self.answer_view.verticalScrollBar().maximum()
+        )
 
     def _append(self, speaker, text):
         self.chat.append(
@@ -347,15 +372,17 @@ class MainWindow(QMainWindow):
     def _show_error(self, error):
         self.ask_button.setEnabled(True)
         self.status.setText("Error")
+        self.answer_view.setPlainText("Answer generation failed. See the error dialog for details.")
         QMessageBox.critical(self, "Interview Copilot error", error)
 
     def clear_chat(self):
         self.chat.clear()
+        self.answer_view.clear()
+        self.transcript.clear()
         self.history.clear()
-        self.overlay.set_answer("Your generated answer will appear here.")
+        self._streamed_answer = ""
 
     def closeEvent(self, event):
         if self.audio is not None:
             self.audio.shutdown()
-        self.overlay.close()
         event.accept()

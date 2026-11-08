@@ -12,8 +12,9 @@ A local-first macOS desktop copilot for meeting and interview assistance. It cap
 - Microphone capture with selectable input device.
 - macOS system-audio capture through Apple's ScreenCaptureKit.
 - Local transcription with MLX Whisper on Apple Silicon.
-- **Toggle hotkey:** press **Control + Option + R** once to start recording; press it again to stop. No key-holding required.
-- Visible Start/Stop button as a fallback.
+- **Recording hotkey:** press **Control + Option + R** once to start recording; press it again to stop. No key-holding required.
+- **Presentation Mode:** press **Control + Option + H** to hide/show the floating overlay without stopping recording, transcription or answer generation.
+- Visible Start/Stop and overlay-toggle buttons as fallbacks.
 - Transcript labels distinguish microphone audio from other participants/system audio.
 - Local transcript refinement and answer generation.
 - Floating always-on-top answer overlay with automatic height adjustment and scrolling for long answers.
@@ -141,6 +142,18 @@ On first transcription, MLX Whisper downloads the configured model from Hugging 
 
 The global shortcut uses `pynput` and the Control + Option + R combination. macOS may require Accessibility and Input Monitoring permissions for the terminal or Python process that launches the app.
 
+### Presentation Mode visibility shortcut
+
+Press **Control + Option + H** to toggle the floating answer overlay:
+
+- If the overlay is visible, the shortcut hides only that window.
+- Microphone recording, system-audio recording, transcription and answer generation continue.
+- Press the shortcut again to show the overlay with the latest answer.
+- The shortcut is manual; the app does not detect when Google Meet starts or stops sharing.
+- The in-app **Toggle overlay (⌃⌥H)** button provides the same behaviour.
+
+The shortcut hides the overlay from your local desktop. It does not pause the audio pipeline or close the app.
+
 ### Microphone selection
 
 Use the Microphone dropdown to select the Mac's built-in microphone, a Bluetooth headset microphone, or another available input device. Use Refresh after connecting/disconnecting a device. The input selector is locked while recording.
@@ -163,7 +176,7 @@ Grant permissions to the app that launches Python (for example, Terminal or VS C
 
 1. **Microphone:** allows capture of your microphone.
 2. **Screen & System Audio Recording:** allows ScreenCaptureKit to capture Mac system audio.
-3. **Accessibility / Input Monitoring:** may be required for the global Control + Option + R shortcut.
+3. **Accessibility / Input Monitoring:** may be required for the global Control + Option + R and Control + Option + H shortcuts.
 4. Restart the app after changing permissions.
 
 Menu names can vary slightly by macOS version. If system audio does not start, verify Screen & System Audio Recording permission and restart the launching application.
@@ -225,6 +238,13 @@ For a native crash trace:
 ```bash
 python -X faulthandler main.py
 ```
+
+### Global shortcuts do not work
+
+- Grant Accessibility and Input Monitoring permissions to Terminal/VS Code/Python as applicable.
+- Restart the app after granting permissions.
+- Check that another application or macOS shortcut is not intercepting Control + Option + R or Control + Option + H.
+- Use the in-app recording and overlay-toggle buttons as fallbacks.
 
 ### Control + Option + R does not work
 

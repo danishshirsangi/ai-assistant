@@ -6,9 +6,12 @@ class AnswerGenerator:
         self.ollama = ollama
         self.rag = rag
 
-    def answer(self, question, history):
+    def answer(self, question, history, on_chunk=None):
         chunks = self.rag.retrieve(question)
-        return self.ollama.chat(build_messages(question, chunks, history))
+        return self.ollama.chat(
+            build_messages(question, chunks, history),
+            on_chunk=on_chunk,
+        )
 
     def answer_from_transcript(self, transcript, history, on_chunk=None):
         # One generation pass: do not spend a second LLM call cleaning Whisper text.

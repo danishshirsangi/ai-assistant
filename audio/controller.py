@@ -155,7 +155,7 @@ class AudioController(QObject):
         except Exception as exc:
             self.error.emit(
                 "Global shortcuts unavailable. Grant Accessibility/Input "
-                "Monitoring permission or use the in-app recording button. " + str(exc)
+                "Monitoring permission or use the in-app buttons. " + str(exc)
             )
 
     def _compile_helper(self):

@@ -212,7 +212,7 @@ def format_response_html(text):
     def flush_code():
         nonlocal code_lines, code_language
         language = html.escape(code_language or "code")
-        source = html.escape("\\n".join(code_lines), quote=False)
+        source = html.escape("\n".join(code_lines), quote=False)
         out.append(
             "<p style='margin:9px 0 4px;color:#9fc5ff;font-size:11px;'><b>"
             + language + "</b></p>"
@@ -256,7 +256,7 @@ def format_response_html(text):
     index = 0
     while index < len(lines):
         raw = lines[index]
-        fence = re.match(r"^\\s*```\\s*([\\w+#.-]*)\\s*$", raw)
+        fence = re.match(r"^\s*```\s*([\w+#.-]*)\s*$", raw)
         if fence:
             if not in_code:
                 flush_paragraph()

@@ -1,6 +1,6 @@
 # Interview Copilot
 
-A local-first macOS desktop copilot for meeting and interview assistance. It captures your microphone and Mac system audio, transcribes both tracks locally with MLX Whisper, refines the transcript with a local Ollama model, and displays a generated response in the main window and floating overlay.
+A local-first macOS desktop copilot for meeting and interview assistance. It captures your microphone and Mac system audio, transcribes both tracks locally with MLX Whisper, and streams generated responses directly into a single always-on-top main window.
 
 > **Privacy note:** Only record meetings when participant consent, company policy and applicable law permit it. The capture-privacy window setting is a best-effort macOS API hint, not a guarantee that every meeting or screen-sharing application will hide the windows.
 
@@ -13,13 +13,14 @@ A local-first macOS desktop copilot for meeting and interview assistance. It cap
 - macOS system-audio capture through Apple's ScreenCaptureKit.
 - Local transcription with MLX Whisper on Apple Silicon.
 - **Toggle hotkey:** press **Control + Option + R** once to start recording; press it again to stop. No key-holding required.
+- Live token-by-token answers appear in the main window for both typed questions and interview transcripts.
 - Visible Start/Stop button as a fallback.
 - Transcript labels distinguish microphone audio from other participants/system audio.
 - Local transcript refinement and answer generation.
-- Floating always-on-top answer overlay with automatic height adjustment and scrolling for long answers.
+- Single main application window with an always-on-top setting and a dedicated live answer pane.
 - Adaptive business-case and executive/managerial response frameworks.
 - macOS accessory-app mode (no Dock icon or normal Cmd-Tab entry).
-- Capture privacy toggle requests exclusion of both app windows from compatible macOS capture APIs.
+- Capture privacy toggle requests exclusion of the main window from compatible macOS capture APIs; this is best-effort and does not guarantee invisibility in screen sharing.
 
 ## Supported environment
 
@@ -64,7 +65,7 @@ ollama serve
 ```bash
 git clone https://github.com/danishshirsangi/ai-assistant.git
 cd ai-assistant
-git switch feature/v0.2-audio-copilot
+git switch feature/single-window-live-responses
 ```
 
 Create and activate a Python 3.12 virtual environment:
@@ -129,7 +130,13 @@ python main.py
 
 On first transcription, MLX Whisper downloads the configured model from Hugging Face. This is a one-time model download; inference is local afterwards. Ollama models are also stored locally.
 
-## 5. Audio recording controls
+## 5. Main window and live answers
+
+Interview Copilot uses one application window; it does not create a separate floating answer overlay. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
+
+Typed questions and questions extracted from interview transcripts stream token by token into the **Latest answer** pane while Ollama generates them. The full completed answer is also added to the conversation history. The answer pane scrolls as new text arrives.
+
+## 6. Audio recording controls
 
 ### Control + Option + R toggle shortcut
 
@@ -157,7 +164,7 @@ Use the Microphone dropdown to select the Mac's built-in microphone, a Bluetooth
 
 Audio files are written briefly to a uniquely named directory under the operating system's temporary folder. They are **not retained in the project directory**. A later app launch also attempts to remove abandoned session folders left by a crashed process. The transcript may remain visible in the app conversation; this cleanup concerns the intermediate audio files.
 
-## 6. macOS permissions
+## 7. macOS permissions
 
 Grant permissions to the app that launches Python (for example, Terminal or VS Code):
 
@@ -168,17 +175,17 @@ Grant permissions to the app that launches Python (for example, Terminal or VS C
 
 Menu names can vary slightly by macOS version. If system audio does not start, verify Screen & System Audio Recording permission and restart the launching application.
 
-## 7. Capture privacy setting
+## 8. Capture privacy setting
 
-The main window's **Capture privacy** toggle applies a macOS window-sharing setting to both the main app window and floating overlay.
+The main window's **Capture privacy** toggle applies a macOS window-sharing setting to the single Interview Copilot window.
 
 - ON requests exclusion from compatible macOS capture APIs.
 - OFF restores the normal sharing setting.
 - The setting is reapplied when windows are shown.
 
-This is not a universal invisibility or anti-capture feature. Some screen-sharing applications, remote desktop tools, screenshots, recording methods or OS versions may ignore the setting or capture windows regardless. Always assume a visible app could be shared and follow workplace rules.
+This is not a universal invisibility or anti-capture feature. Apple's current documentation describes `NSWindowSharingNone` as a legacy value and says not to use it to hide content from capture. Some screen-sharing applications, remote desktop tools, screenshots, recording methods or OS versions may capture the window regardless. Always assume a visible app could be shared and follow workplace rules.
 
-## 8. Project layout
+## 9. Project layout
 
 ```text
 .
@@ -195,7 +202,6 @@ This is not a universal invisibility or anti-capture feature. Some screen-sharin
 │   ├── prompts.py                 # Prompt templates
 │   └── resume_rag.py              # Local resume retrieval
 ├── ui/
-│   ├── floating_overlay.py        # Floating answer window
 │   ├── macos_window_privacy.py    # macOS window capture setting
 │   ├── main_window.py             # Main PySide6 UI
 │   └── worker.py                  # Background task worker
@@ -206,7 +212,7 @@ This is not a universal invisibility or anti-capture feature. Some screen-sharin
 └── main.py                        # Application entry point
 ```
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 ### Python crashes with segmentation fault
 
@@ -263,7 +269,7 @@ ollama list
 
 Ensure `qwen3:8b` and `nomic-embed-text` are present.
 
-## 10. Local data and security
+## 11. Local data and security
 
 - Resume embeddings are stored locally in SQLite under `vector_db/`.
 - Ollama models and the MLX Whisper model are stored in their respective local model caches.
@@ -271,11 +277,11 @@ Ensure `qwen3:8b` and `nomic-embed-text` are present.
 - Do not commit resumes, transcripts, temporary audio, credentials or local databases.
 - `data/`, `vector_db/`, virtual environments and Python cache files are ignored by Git.
 
-## 11. Updating
+## 12. Updating
 
 ```bash
-git switch feature/v0.2-audio-copilot
-git pull origin feature/v0.2-audio-copilot
+git switch feature/single-window-live-responses
+git pull origin feature/single-window-live-responses
 source .venv/bin/activate
 python main.py
 ```

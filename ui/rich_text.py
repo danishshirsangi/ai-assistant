@@ -135,12 +135,14 @@ def _inline_plain(source):
     rendered = re.sub(
         r"==(.+?)==",
         r"<span style='background:#71551c;color:#fff0bd;padding:1px 4px;"
-        r"border-radius:3px;'><b>\1</b></span>",
+        r"border-radius:3px;'><u><b>\1</b></u></span>",
         rendered,
     )
     rendered = re.sub(r"__(.+?)__", r"<u>\1</u>", rendered)
     rendered = re.sub(r"~~(.+?)~~", r"<s>\1</s>", rendered)
     rendered = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<i>\1</i>", rendered)
+
+    rendered = re.sub(r"(?<!\\w)_([^_\\n]+)_(?!\\w)", r"<i>\\1</i>", rendered)
 
     for key, value in placeholders.items():
         rendered = rendered.replace(html.escape(key), value)

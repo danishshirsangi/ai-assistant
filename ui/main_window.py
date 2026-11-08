@@ -316,7 +316,7 @@ class MainWindow(QMainWindow):
 
     def _recording_changed(self, active):
         self.record_button.setText("Stop recording" if active else "Start recording")
-        self.audio_hint.setText("Recording… press ⌃⌥R again to stop" if active else "Transcribing locally…")
+        self.audio_hint.setText("Recording · ⌃⌥R stop · ⌃⌥H overlay" if active else "Transcribing locally… · ⌃⌥H overlay")
         self.microphone.setEnabled(not active)
         self.refresh_microphones_button.setEnabled(not active)
         self.status.setText("Recording mic + system audio…" if active else "Transcribing locally…")

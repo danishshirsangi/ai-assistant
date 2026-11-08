@@ -20,6 +20,7 @@ from audio.transcriber import transcribe_local
 class AudioController(QObject):
     recording_changed = Signal(bool)
     transcript_ready = Signal(str)
+    overlay_toggle_requested = Signal()
     error = Signal(str)
 
     def __init__(self, project_root=None):
@@ -39,6 +40,7 @@ class AudioController(QObject):
         self._system_path = None
         self._listener = None
         self._hotkey_down = False
+        self._overlay_hotkey_down = False
         self._pressed_modifiers = set()
         self.selected_input_device = None  # None means macOS default input
 
@@ -100,41 +102,59 @@ class AudioController(QObject):
             }
 
             def on_press(key):
+                toggle_recording = False
+                toggle_overlay = False
+                active = False
                 with self._lock:
                     if key in modifiers:
                         self._pressed_modifiers.add(key)
-                    is_combo = (
-                        isinstance(key, keyboard.KeyCode)
-                        and key.char is not None
-                        and key.char.lower() == "r"
-                        and any(k in self._pressed_modifiers for k in
-                                (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r))
-                        and any(k in self._pressed_modifiers for k in
-                                (keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r))
+
+                    ctrl_down = any(k in self._pressed_modifiers for k in
+                                    (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r))
+                    alt_down = any(k in self._pressed_modifiers for k in
+                                   (keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r))
+                    char = (
+                        key.char.lower()
+                        if isinstance(key, keyboard.KeyCode) and key.char
+                        else None
                     )
-                    if not is_combo or self._hotkey_down:
-                        return
-                    self._hotkey_down = True
-                    active = self._recording
-                # Toggle with Control + Option + R.
-                if active:
-                    self.stop_recording()
-                else:
-                    self.start_recording()
+
+                    if ctrl_down and alt_down and char == "r" and not self._hotkey_down:
+                        self._hotkey_down = True
+                        toggle_recording = True
+                        active = self._recording
+                    elif ctrl_down and alt_down and char == "h" and not self._overlay_hotkey_down:
+                        self._overlay_hotkey_down = True
+                        toggle_overlay = True
+
+                if toggle_recording:
+                    # Toggle recording with Control + Option + R.
+                    if active:
+                        self.stop_recording()
+                    else:
+                        self.start_recording()
+
+                if toggle_overlay:
+                    # Emit a Qt signal so the UI toggles on the Qt main thread.
+                    self.overlay_toggle_requested.emit()
 
             def on_release(key):
                 with self._lock:
                     if key in modifiers:
                         self._pressed_modifiers.discard(key)
-                    if isinstance(key, keyboard.KeyCode) and key.char and key.char.lower() == "r":
-                        self._hotkey_down = False
+                    if isinstance(key, keyboard.KeyCode) and key.char:
+                        char = key.char.lower()
+                        if char == "r":
+                            self._hotkey_down = False
+                        elif char == "h":
+                            self._overlay_hotkey_down = False
 
             self._listener = keyboard.Listener(on_press=on_press, on_release=on_release)
             self._listener.daemon = True
             self._listener.start()
         except Exception as exc:
             self.error.emit(
-                "Global recording shortcut unavailable. Grant Accessibility/Input "
+                "Global shortcuts unavailable. Grant Accessibility/Input "
                 "Monitoring permission or use the in-app recording button. " + str(exc)
             )
 

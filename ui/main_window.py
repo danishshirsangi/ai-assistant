@@ -579,6 +579,7 @@ class MainWindow(QMainWindow):
         self.chat.verticalScrollBar().setValue(self.chat.verticalScrollBar().maximum())
 
     def _show_error(self, error):
+        self._stream_render_timer.stop()
         self.ask_button.setEnabled(True)
         self._set_status("Error", warning=True)
         self.answer_view.setHtml(

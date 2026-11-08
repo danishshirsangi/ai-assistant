@@ -12,8 +12,10 @@ A local-first macOS desktop copilot for meeting and interview assistance. It cap
 - Microphone capture with selectable input device.
 - macOS system-audio capture through Apple's ScreenCaptureKit.
 - Local transcription with MLX Whisper on Apple Silicon.
-- **Toggle hotkey:** press **Control + Option + R** once to start recording; press it again to stop. No key-holding required.
+- **Recording hotkey:** press **Control + Option + R** once to start recording; press it again to stop.
+- **Window visibility hotkey:** press **Control + Option + H** to hide Interview Copilot; press it again to restore the window.
 - Live token-by-token answers appear in the main window for both typed questions and interview transcripts.
+- Rich answer formatting supports Markdown headings, bold, italic, underline, highlights, strikethrough, lists, tables, blockquotes, links, inline/fenced code and common LaTeX.
 - Visible Start/Stop button as a fallback.
 - Transcript labels distinguish microphone audio from other participants/system audio.
 - Local transcript refinement and answer generation.
@@ -65,7 +67,7 @@ ollama serve
 ```bash
 git clone https://github.com/danishshirsangi/ai-assistant.git
 cd ai-assistant
-git switch feature/single-window-live-responses
+git switch feature/main-window-toggle-rich-formatting
 ```
 
 Create and activate a Python 3.12 virtual environment:
@@ -134,7 +136,9 @@ On first transcription, MLX Whisper downloads the configured model from Hugging 
 
 Interview Copilot uses one application window; it does not create a separate floating answer overlay. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
 
-Typed questions and questions extracted from interview transcripts stream token by token into the **Latest answer** pane while Ollama generates them. The full completed answer is also added to the conversation history. The answer pane scrolls as new text arrives.
+Typed questions and questions extracted from interview transcripts stream token by token into the **Latest answer** pane while Ollama generates them. Markdown styling is refreshed during streaming and finalized when generation completes. The renderer supports headings, **bold**, *italic*, underline, ==highlights==, ~~strikethrough~~, numbered/bulleted lists, tables, blockquotes, links, inline/fenced code, and common LaTeX math. The full completed answer is also added to the conversation history.
+
+Press **Control + Option + H** to hide the entire main window while you work in other applications. Press the same shortcut again to restore it. Hiding the window does not quit the app or stop recording, transcription or answer generation. The in-app **Hide window** button provides the same action.
 
 ## 6. Audio recording controls
 
@@ -146,7 +150,14 @@ Typed questions and questions extracted from interview transcripts stream token 
 - The app shows a recording state and changes the button to **Stop recording** while active.
 - If the global shortcut is unavailable, click the in-app Start/Stop button.
 
-The global shortcut uses `pynput` and the Control + Option + R combination. macOS may require Accessibility and Input Monitoring permissions for the terminal or Python process that launches the app.
+The global shortcuts use `pynput`. macOS may require Accessibility and Input Monitoring permissions for the terminal or Python process that launches the app.
+
+### Hide and restore the main window
+
+- Press **Control + Option + H** to hide Interview Copilot.
+- Press **Control + Option + H** again to show it, bring it forward and restore the always-on-top window.
+- Hiding the window does not close the app or stop audio capture, transcription or generation.
+- The **Hide window** button is an in-app alternative. When the app is hidden, use the global shortcut to restore it.
 
 ### Microphone selection
 
@@ -170,7 +181,7 @@ Grant permissions to the app that launches Python (for example, Terminal or VS C
 
 1. **Microphone:** allows capture of your microphone.
 2. **Screen & System Audio Recording:** allows ScreenCaptureKit to capture Mac system audio.
-3. **Accessibility / Input Monitoring:** may be required for the global Control + Option + R shortcut.
+3. **Accessibility / Input Monitoring:** may be required for the global Control + Option + R recording shortcut and Control + Option + H window-visibility shortcut.
 4. Restart the app after changing permissions.
 
 Menu names can vary slightly by macOS version. If system audio does not start, verify Screen & System Audio Recording permission and restart the launching application.
@@ -232,6 +243,12 @@ For a native crash trace:
 python -X faulthandler main.py
 ```
 
+### Control + Option + H does not work
+
+- Grant Accessibility and Input Monitoring permissions to Terminal/VS Code/Python as applicable.
+- Restart the app after granting permissions.
+- Use the in-app Hide window button while the main window is visible.
+
 ### Control + Option + R does not work
 
 - Use the in-app recording button to confirm audio capture works independently.
@@ -280,8 +297,8 @@ Ensure `qwen3:8b` and `nomic-embed-text` are present.
 ## 12. Updating
 
 ```bash
-git switch feature/single-window-live-responses
-git pull origin feature/single-window-live-responses
+git switch feature/main-window-toggle-rich-formatting
+git pull origin feature/main-window-toggle-rich-formatting
 source .venv/bin/activate
 python main.py
 ```

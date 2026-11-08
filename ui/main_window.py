@@ -1,52 +1,113 @@
 from pathlib import Path
+
+from PySide6.QtCore import Qt, QThreadPool, QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QFileDialog, QMessageBox, QComboBox, QSplitter
+    QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QMainWindow, QMessageBox, QPushButton, QSplitter, QTextBrowser,
+    QVBoxLayout, QWidget,
 )
-from PySide6.QtCore import Qt, QThreadPool
-from PySide6.QtGui import QIcon, QTextCursor
+
+from core.answer_generator import AnswerGenerator
 from core.ollama_client import OllamaClient
 from core.resume_rag import ResumeRAG
-from core.answer_generator import AnswerGenerator
-from ui.worker import FunctionWorker
-from ui.rich_text import format_response_html
 from ui.macos_window_privacy import set_window_capture_exclusion
+from ui.rich_text import format_response_html
+from ui.worker import FunctionWorker
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Interview Copilot")
-        self.setWindowIcon(QIcon(str(Path(__file__).resolve().parents[1] / "assets" / "interview-copilot.svg")))
-        # Keep the single main application window above other app windows.
+        self.setWindowIcon(
+            QIcon(str(Path(__file__).resolve().parents[1] / "assets" / "interview-copilot.svg"))
+        )
+        # Keep the main application window above other app windows.
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.resize(1050, 760)
-        self.setMinimumSize(760, 560)
+        self.resize(1180, 850)
+        self.setMinimumSize(900, 650)
+
         self.setStyleSheet("""
-            QMainWindow, QWidget { background: #111827; color: #e8eef8; }
-            QLabel { color: #e8eef8; }
-            QLineEdit, QTextEdit, QComboBox {
-                background: #1b2638; color: #edf4ff;
-                border: 1px solid #344763; border-radius: 7px;
-                padding: 7px; selection-background-color: #4169a5;
+            QMainWindow, QWidget {
+                background: #0c1422;
+                color: #e8eef8;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             }
-            QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
-                border: 1px solid #79a9ed;
+            QLabel { color: #e8eef8; background: transparent; }
+            QFrame#surfacePanel {
+                background: #131f31;
+                border: 1px solid #293b55;
+                border-radius: 12px;
+            }
+            QLabel#appTitle { font-size: 23px; font-weight: 750; color: #f4f7ff; }
+            QLabel#appSubtitle { font-size: 11px; color: #91a4c0; }
+            QLabel#sectionTitle { font-size: 13px; font-weight: 700; color: #c9dafa; }
+            QLabel#sectionHint { font-size: 10px; color: #8195b2; }
+            QLabel#status {
+                color: #b8d5ff;
+                background: #1a2e49;
+                border: 1px solid #345477;
+                border-radius: 10px;
+                padding: 5px 10px;
+                font-size: 11px;
+                font-weight: 650;
+            }
+            QLineEdit, QComboBox {
+                background: #17263a;
+                color: #edf4ff;
+                border: 1px solid #344a68;
+                border-radius: 8px;
+                padding: 8px 10px;
+                selection-background-color: #4169a5;
+                min-height: 18px;
+            }
+            QLineEdit:focus, QComboBox:focus { border: 1px solid #83b2f1; }
+            QTextBrowser {
+                background: #101b2b;
+                color: #eaf1fc;
+                border: 1px solid #263a54;
+                border-radius: 8px;
+                padding: 10px;
+                selection-background-color: #4169a5;
+                font-size: 13px;
             }
             QPushButton {
-                background: #263a58; color: #f2f6ff;
-                border: 1px solid #405c83; border-radius: 7px;
-                padding: 7px 12px; font-weight: 600;
+                background: #263d5d;
+                color: #f2f6ff;
+                border: 1px solid #405d83;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 11px;
+                font-weight: 650;
             }
-            QPushButton:hover { background: #34527b; }
-            QPushButton:pressed { background: #1d2d45; }
-            QPushButton:disabled { color: #7f8da3; background: #202b3b; }
-            QComboBox QAbstractItemView {
-                background: #1b2638; color: #edf4ff;
-                selection-background-color: #34527b;
+            QPushButton:hover { background: #34547e; }
+            QPushButton:pressed { background: #1c2f49; }
+            QPushButton:disabled {
+                color: #7b8ba2;
+                background: #1a2738;
+                border-color: #2b3b52;
             }
-            QSplitter::handle { background: #293a52; }
+            QPushButton#primaryButton {
+                background: #3975bf;
+                border-color: #5792d8;
+                color: white;
+                padding-left: 17px;
+                padding-right: 17px;
+            }
+            QPushButton#primaryButton:hover { background: #4888d3; }
+            QPushButton#recordButton {
+                background: #253c5a;
+                border-color: #49698e;
+                min-width: 112px;
+            }
+            QPushButton#hideButton {
+                background: #1b2a3e;
+                border-color: #334b68;
+            }
+            QSplitter::handle { background: #1d2d43; height: 5px; width: 5px; }
         """)
+
         self.pool = QThreadPool.globalInstance()
         self.ollama = OllamaClient()
         self.rag = ResumeRAG(self.ollama)
@@ -55,101 +116,211 @@ class MainWindow(QMainWindow):
         self._streamed_answer = ""
         self._capture_privacy_enabled = True
         self.audio = None
+
+        # Render Markdown periodically while streaming instead of rebuilding the
+        # entire rich-text document for every token.
+        self._stream_render_timer = QTimer(self)
+        self._stream_render_timer.setSingleShot(True)
+        self._stream_render_timer.setInterval(120)
+        self._stream_render_timer.timeout.connect(self._render_streamed_answer)
+
         self._build_ui()
         self._setup_audio()
         self._check_server()
+
+    def _make_panel(self, title, hint=None):
+        panel = QFrame()
+        panel.setObjectName("surfacePanel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(12, 10, 12, 12)
+        layout.setSpacing(7)
+
+        header = QHBoxLayout()
+        heading = QLabel(title)
+        heading.setObjectName("sectionTitle")
+        header.addWidget(heading)
+        header.addStretch()
+        if hint:
+            hint_label = QLabel(hint)
+            hint_label.setObjectName("sectionHint")
+            header.addWidget(hint_label)
+        layout.addLayout(header)
+        return panel, layout
 
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(12)
 
-        top = QHBoxLayout()
+        # Header
+        header = QHBoxLayout()
+        title_group = QVBoxLayout()
+        title_group.setSpacing(2)
         title = QLabel("Interview Copilot")
-        title.setStyleSheet("font-size: 23px; font-weight: 700;")
+        title.setObjectName("appTitle")
+        subtitle = QLabel("Your local interview assistant")
+        subtitle.setObjectName("appSubtitle")
+        title_group.addWidget(title)
+        title_group.addWidget(subtitle)
+        header.addLayout(title_group)
+        header.addStretch()
         self.status = QLabel("Checking Ollama…")
-        self.status.setStyleSheet("color: #b7791f;")
-        top.addWidget(title)
-        top.addStretch()
-        top.addWidget(self.status)
-        root.addLayout(top)
+        self.status.setObjectName("status")
+        header.addWidget(self.status)
+        root.addLayout(header)
 
+        # Compact toolbar
         toolbar = QHBoxLayout()
+        toolbar.setSpacing(8)
+        model_label = QLabel("MODEL")
+        model_label.setObjectName("sectionHint")
         self.model = QComboBox()
         self.model.addItems(["qwen3:8b"])
+        self.model.setMinimumWidth(150)
+
         upload = QPushButton("Upload resume")
         upload.clicked.connect(self.upload_resume)
-        clear = QPushButton("Clear conversation")
+        clear = QPushButton("Clear")
+        clear.setToolTip("Clear conversation, transcript and latest answer")
         clear.clicked.connect(self.clear_chat)
+
         self.privacy_button = QPushButton("Capture privacy: ON")
         self.privacy_button.setToolTip(
-            "Request exclusion of the main Interview Copilot window from compatible macOS capture APIs. "
-            "This is best-effort and not a universal screen-sharing guarantee."
+            "Best-effort request to exclude this window from compatible macOS capture APIs. "
+            "This does not guarantee invisibility in meeting apps."
         )
         self.privacy_button.clicked.connect(self._toggle_capture_privacy)
-        toolbar.addWidget(QLabel("Chat model:"))
+
+        self.hide_button = QPushButton("Hide window  ⌃⌥H")
+        self.hide_button.setObjectName("hideButton")
+        self.hide_button.setToolTip(
+            "Hide Interview Copilot so you can work in other apps. Press Control + Option + H to restore it."
+        )
+        self.hide_button.clicked.connect(self._toggle_window_visibility)
+
+        toolbar.addWidget(model_label)
         toolbar.addWidget(self.model)
         toolbar.addWidget(upload)
         toolbar.addWidget(clear)
         toolbar.addWidget(self.privacy_button)
+        toolbar.addStretch()
+        toolbar.addWidget(self.hide_button)
         root.addLayout(toolbar)
 
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        self.chat = QTextEdit()
-        self.chat.setReadOnly(True)
-        self.chat.setPlaceholderText("Your conversation will appear here.")
-        self.chat.setStyleSheet("font-size: 14px; padding: 8px;")
-        self.transcript = QTextEdit()
-        self.transcript.setReadOnly(True)
-        self.transcript.setMaximumHeight(125)
-        self.transcript.setPlaceholderText("Transcript appears here after you stop recording.")
-        self.answer_view = QTextEdit()
-        self.answer_view.setReadOnly(True)
-        self.answer_view.setPlaceholderText(
-            "The latest answer will appear here and stream live while the model generates it."
+        # Main workspace: source panels on the left, readable live answer on the right.
+        workspace = QSplitter(Qt.Orientation.Horizontal)
+        workspace.setChildrenCollapsible(False)
+
+        left_column = QWidget()
+        left_layout = QVBoxLayout(left_column)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(10)
+
+        conversation_panel, conversation_layout = self._make_panel(
+            "CONVERSATION", "recent turns"
         )
-        self.answer_view.setStyleSheet("font-size: 15px; padding: 10px;")
-        self.answer_view.setMinimumHeight(150)
+        self.chat = QTextBrowser()
+        self.chat.setOpenExternalLinks(False)
+        self.chat.setPlaceholderText("Your questions and completed answers will appear here.")
+        self.chat.setStyleSheet("font-size: 12px;")
+        conversation_layout.addWidget(self.chat, 1)
 
-        splitter.addWidget(self.chat)
-        splitter.addWidget(self.answer_view)
-        splitter.addWidget(self.transcript)
-        splitter.setSizes([330, 300, 110])
-        root.addWidget(splitter, 1)
+        transcript_panel, transcript_layout = self._make_panel(
+            "LIVE TRANSCRIPT", "local transcription"
+        )
+        self.transcript = QTextBrowser()
+        self.transcript.setOpenExternalLinks(False)
+        self.transcript.setPlaceholderText(
+            "After recording stops, the microphone and meeting transcript will appear here."
+        )
+        self.transcript.setStyleSheet("font-size: 11px; color: #b8c8df;")
+        transcript_layout.addWidget(self.transcript, 1)
 
-        audio_bar = QHBoxLayout()
+        left_layout.addWidget(conversation_panel, 3)
+        left_layout.addWidget(transcript_panel, 2)
+
+        answer_panel, answer_layout = self._make_panel(
+            "LATEST ANSWER", "live response"
+        )
+        answer_header_hint = QLabel(
+            "Formatted response · updates as the model generates"
+        )
+        answer_header_hint.setObjectName("sectionHint")
+        answer_layout.addWidget(answer_header_hint)
+        self.answer_view = QTextBrowser()
+        self.answer_view.setObjectName("answerView")
+        self.answer_view.setOpenExternalLinks(False)
+        self.answer_view.setPlaceholderText(
+            "Your answer will appear here with headings, bold text, highlights, code and lists."
+        )
+        self.answer_view.setStyleSheet(
+            "QTextBrowser { font-size: 14px; padding: 14px; line-height: 1.5; }"
+        )
+        answer_layout.addWidget(self.answer_view, 1)
+
+        workspace.addWidget(left_column)
+        workspace.addWidget(answer_panel)
+        workspace.setSizes([390, 760])
+        root.addWidget(workspace, 1)
+
+        # Recording controls
+        recording_panel, recording_layout = self._make_panel(
+            "AUDIO INPUT", "Control + Option + R to start / stop"
+        )
+        recording_row = QHBoxLayout()
         self.record_button = QPushButton("Start recording")
-        self.record_button.setToolTip("Press Control + Option + R once to start recording; press again to stop. You can also use this button.")
+        self.record_button.setObjectName("recordButton")
+        self.record_button.setToolTip(
+            "Press Control + Option + R to start recording; press again to stop."
+        )
         self.record_button.clicked.connect(self._toggle_recording)
+
+        microphone_label = QLabel("Microphone")
+        microphone_label.setObjectName("sectionHint")
         self.microphone = QComboBox()
-        self.microphone.setMinimumWidth(210)
+        self.microphone.setMinimumWidth(220)
         self.microphone.setToolTip("Choose the microphone used for your voice.")
         self.microphone.addItem("System default (macOS)", None)
         self.refresh_microphones_button = QPushButton("Refresh")
         self.refresh_microphones_button.setToolTip("Refresh available microphones.")
         self.refresh_microphones_button.clicked.connect(self._refresh_microphones)
-        self.audio_hint = QLabel("Mic + system audio · local transcription")
-        self.audio_hint.setStyleSheet("color: #777; font-size: 11px;")
-        audio_bar.addWidget(self.record_button)
-        audio_bar.addWidget(QLabel("Microphone:"))
-        audio_bar.addWidget(self.microphone)
-        audio_bar.addWidget(self.refresh_microphones_button)
-        audio_bar.addWidget(self.audio_hint, 1)
-        root.addLayout(audio_bar)
 
-        bottom = QHBoxLayout()
+        self.audio_hint = QLabel("Mic + system audio · local transcription")
+        self.audio_hint.setObjectName("sectionHint")
+
+        recording_row.addWidget(self.record_button)
+        recording_row.addSpacing(8)
+        recording_row.addWidget(microphone_label)
+        recording_row.addWidget(self.microphone)
+        recording_row.addWidget(self.refresh_microphones_button)
+        recording_row.addStretch()
+        recording_row.addWidget(self.audio_hint)
+        recording_layout.addLayout(recording_row)
+        root.addWidget(recording_panel)
+
+        # Typed question composer
+        composer = QHBoxLayout()
+        composer.setSpacing(9)
         self.question = QLineEdit()
-        self.question.setPlaceholderText("Ask an interview or analytics question…")
+        self.question.setPlaceholderText(
+            "Ask an interview, SQL, Python or data engineering question…"
+        )
         self.question.returnPressed.connect(self.ask)
         self.ask_button = QPushButton("Generate answer")
+        self.ask_button.setObjectName("primaryButton")
         self.ask_button.clicked.connect(self.ask)
-        bottom.addWidget(self.question, 1)
-        bottom.addWidget(self.ask_button)
-        root.addLayout(bottom)
+        composer.addWidget(self.question, 1)
+        composer.addWidget(self.ask_button)
+        root.addLayout(composer)
 
-        note = QLabel("Local mode · Ollama + SQLite · audio captured and transcribed on this Mac")
-        note.setStyleSheet("color: #777; font-size: 11px;")
-        root.addWidget(note)
+        footer = QLabel(
+            "⌃⌥R  Record / stop     ·     ⌃⌥H  Hide / restore window     ·     Local AI processing"
+        )
+        footer.setObjectName("sectionHint")
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(footer)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -171,8 +342,8 @@ class MainWindow(QMainWindow):
                 "Capture privacy: ON (unavailable)" if enabled else "Capture privacy: OFF"
             )
             self.privacy_button.setToolTip(
-                "Could not apply privacy to the main window: " + detail +
-                "\\nMeeting-app behaviour varies; this is not a universal guarantee."
+                "Could not apply the capture privacy request: " + detail +
+                "\nMeeting-app behaviour varies; this is not a universal guarantee."
             )
         else:
             self.privacy_button.setToolTip(
@@ -181,19 +352,34 @@ class MainWindow(QMainWindow):
                 " compatible macOS capture APIs. Meeting-app behaviour varies."
             )
 
+    def _toggle_window_visibility(self):
+        """Hide or restore the main window without touching audio or workers."""
+        if self.isVisible():
+            self.hide()
+            return
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
     def _setup_audio(self):
         try:
             from audio.controller import AudioController
+
             self.audio = AudioController()
             self.audio.recording_changed.connect(self._recording_changed)
             self.audio.transcript_ready.connect(self._audio_transcript_ready)
+            self.audio.window_visibility_toggle_requested.connect(
+                self._toggle_window_visibility
+            )
             self.audio.error.connect(self._audio_error)
             self.microphone.currentIndexChanged.connect(self._microphone_changed)
             self._refresh_microphones()
             self.audio.start_hotkey_listener()
-            self.audio_hint.setText("⌃⌥R to start · press again to stop · local audio only")
+            self.audio_hint.setText("⌃⌥R record · ⌃⌥H hide / restore window")
         except Exception as exc:
-            self.audio_hint.setText("Audio dependencies unavailable. Install requirements-audio-macos.txt")
+            self.audio_hint.setText(
+                "Audio dependencies unavailable. Install requirements-audio-macos.txt"
+            )
             self.record_button.setEnabled(False)
             self.status.setToolTip(str(exc))
 
@@ -221,21 +407,29 @@ class MainWindow(QMainWindow):
             return
         try:
             self.audio.set_input_device(self.microphone.currentData())
-            name = self.microphone.currentText()
-            self.audio_hint.setText("Microphone: " + name)
+            self.audio_hint.setText("Microphone: " + self.microphone.currentText())
         except Exception as exc:
             self.audio_hint.setText("Microphone selection failed: " + str(exc))
 
     def _check_server(self):
         worker = FunctionWorker(self.ollama.health)
         worker.signals.result.connect(self._server_ok)
-        worker.signals.error.connect(lambda e: self.status.setText("Ollama offline — run ollama serve"))
+        worker.signals.error.connect(
+            lambda _error: self._set_status("Ollama offline — run ollama serve", warning=True)
+        )
         self.pool.start(worker)
 
+    def _set_status(self, text, warning=False):
+        self.status.setText(text)
+        self.status.setStyleSheet(
+            "color: #ffd58a; background: #382c1b; border: 1px solid #75552b; "
+            "border-radius: 10px; padding: 5px 10px;"
+            if warning else ""
+        )
+
     def _server_ok(self, data):
-        self.status.setText("Ollama connected")
-        self.status.setStyleSheet("color: #16803c;")
-        names = [m.get("name") for m in data.get("models", []) if m.get("name")]
+        self._set_status("Ollama connected")
+        names = [model.get("name") for model in data.get("models", []) if model.get("name")]
         if names:
             self.model.clear()
             self.model.addItems(names)
@@ -249,17 +443,15 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
-        self.status.setText("Indexing resume…")
+        self._set_status("Indexing resume…")
         worker = FunctionWorker(self.rag.add_file, path)
         worker.signals.result.connect(lambda count: self._resume_done(path, count))
         worker.signals.error.connect(self._show_error)
         self.pool.start(worker)
 
     def _resume_done(self, path, count):
-        self.status.setText("Resume indexed")
-        self.transcript.setPlainText(
-            f"Loaded: {Path(path).name}\nIndexed {count} searchable sections locally."
-        )
+        self._set_status("Resume indexed")
+        self._append("Resume", f"Loaded **{Path(path).name}** · indexed {count} searchable sections.")
         QMessageBox.information(
             self, "Resume ready",
             f"Resume indexed successfully.\n{count} sections added to local search."
@@ -273,7 +465,7 @@ class MainWindow(QMainWindow):
         self.question.clear()
         self._append("You", question)
         self.ask_button.setEnabled(False)
-        self.status.setText("Thinking…")
+        self._set_status("Thinking…")
         self._begin_answer_stream()
         worker = FunctionWorker(
             self.generator.answer,
@@ -289,8 +481,8 @@ class MainWindow(QMainWindow):
     def _audio_transcript_ready(self, transcript):
         self.transcript.setPlainText(transcript)
         self._append("Live transcript", transcript)
-        self.status.setText("Finding relevant context…")
         self.ask_button.setEnabled(False)
+        self._set_status("Finding relevant context…")
         self._begin_answer_stream()
         worker = FunctionWorker(
             self.generator.answer_from_transcript,
@@ -304,50 +496,68 @@ class MainWindow(QMainWindow):
         self.pool.start(worker)
 
     def _answer_progress(self, token):
-        # Append only the new token so long streamed answers do not repeatedly
-        # rebuild the entire text widget on every chunk.
-        if not self._streamed_answer:
-            self.answer_view.clear()
         self._streamed_answer += token
-        cursor = self.answer_view.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        cursor.insertText(token)
-        self.answer_view.setTextCursor(cursor)
-        self.answer_view.ensureCursorVisible()
-        self.status.setText("Generating answer…")
+        self._set_status("Generating answer…")
+        if not self._stream_render_timer.isActive():
+            self._stream_render_timer.start()
 
     def _audio_answer_progress(self, token):
         self._answer_progress(token)
 
     def _begin_answer_stream(self):
+        self._stream_render_timer.stop()
         self._streamed_answer = ""
-        self.answer_view.setPlainText("Generating answer…")
+        self.answer_view.setHtml(
+            "<p style='color:#9fb7d6;'>Generating answer…</p>"
+        )
+
+    def _render_streamed_answer(self):
+        if not self._streamed_answer:
+            return
+        scrollbar = self.answer_view.verticalScrollBar()
+        keep_at_bottom = scrollbar.value() >= scrollbar.maximum() - 8
+        self.answer_view.setHtml(format_response_html(self._streamed_answer))
+        if keep_at_bottom:
+            scrollbar.setValue(scrollbar.maximum())
+
+    def _finish_answer_stream(self, answer):
+        self._stream_render_timer.stop()
+        self._streamed_answer = answer
+        self.answer_view.setHtml(format_response_html(answer))
+        self.answer_view.verticalScrollBar().setValue(
+            self.answer_view.verticalScrollBar().maximum()
+        )
 
     def _audio_answer_done(self, result):
         transcript, answer = result
         self.transcript.setPlainText(transcript)
         self._append("Copilot", answer)
         self.history.extend([
-            {"role": "user", "content": "Live interview transcript:\\n" + transcript},
+            {"role": "user", "content": "Live interview transcript:\n" + transcript},
             {"role": "assistant", "content": answer},
         ])
         self._finish_answer_stream(answer)
         self.ask_button.setEnabled(True)
-        self.status.setText("Ready")
+        self._set_status("Ready")
 
     def _recording_changed(self, active):
         self.record_button.setText("Stop recording" if active else "Start recording")
-        self.audio_hint.setText("Recording… press ⌃⌥R again to stop" if active else "Transcribing locally…")
+        self.audio_hint.setText(
+            "Recording · ⌃⌥R stop · ⌃⌥H hide window"
+            if active else "Transcribing locally…"
+        )
         self.microphone.setEnabled(not active)
         self.refresh_microphones_button.setEnabled(not active)
-        self.status.setText("Recording mic + system audio…" if active else "Transcribing locally…")
+        self._set_status(
+            "Recording mic + system audio…" if active else "Transcribing locally…"
+        )
 
     def _toggle_recording(self):
         if self.audio is not None:
             self.audio.toggle_recording()
 
     def _audio_error(self, message):
-        self.status.setText("Audio error")
+        self._set_status("Audio error", warning=True)
         self.audio_hint.setText(message)
         self.record_button.setText("Start recording")
 
@@ -359,24 +569,21 @@ class MainWindow(QMainWindow):
         ])
         self._finish_answer_stream(answer)
         self.ask_button.setEnabled(True)
-        self.status.setText("Ready")
-
-    def _finish_answer_stream(self, answer):
-        self.answer_view.setHtml(format_response_html(answer))
-        self.answer_view.verticalScrollBar().setValue(
-            self.answer_view.verticalScrollBar().maximum()
-        )
+        self._set_status("Ready")
 
     def _append(self, speaker, text):
         self.chat.append(
-            f"<p style='margin:12px 0 4px 0'><b>{speaker}</b></p>"
+            f"<p style='margin:9px 0 3px;color:#a9ccff;'><b>{speaker}</b></p>"
             + format_response_html(text)
         )
+        self.chat.verticalScrollBar().setValue(self.chat.verticalScrollBar().maximum())
 
     def _show_error(self, error):
         self.ask_button.setEnabled(True)
-        self.status.setText("Error")
-        self.answer_view.setPlainText("Answer generation failed. See the error dialog for details.")
+        self._set_status("Error", warning=True)
+        self.answer_view.setHtml(
+            "<p style='color:#ffb4a8;'>Answer generation failed. See the error dialog for details.</p>"
+        )
         QMessageBox.critical(self, "Interview Copilot error", error)
 
     def clear_chat(self):
@@ -385,8 +592,11 @@ class MainWindow(QMainWindow):
         self.transcript.clear()
         self.history.clear()
         self._streamed_answer = ""
+        self._stream_render_timer.stop()
+        self._set_status("Ready")
 
     def closeEvent(self, event):
+        self._stream_render_timer.stop()
         if self.audio is not None:
             self.audio.shutdown()
         event.accept()

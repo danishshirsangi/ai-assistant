@@ -304,10 +304,14 @@ class MainWindow(QMainWindow):
         self.pool.start(worker)
 
     def _answer_progress(self, token):
+        # Append only the new token so long streamed answers do not repeatedly
+        # rebuild the entire text widget on every chunk.
+        if not self._streamed_answer:
+            self.answer_view.clear()
         self._streamed_answer += token
-        self.answer_view.setPlainText(self._streamed_answer)
         cursor = self.answer_view.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
+        cursor.insertText(token)
         self.answer_view.setTextCursor(cursor)
         self.answer_view.ensureCursorVisible()
         self.status.setText("Generating answer…")

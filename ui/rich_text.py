@@ -4,10 +4,10 @@ from urllib.parse import urlsplit
 
 
 GREEK = {
-    r"\\mu": "μ", r"\\sigma": "σ", r"\\bar{x}": "x̄", r"\\alpha": "α",
-    r"\\beta": "β", r"\\theta": "θ", r"\\pi": "π", r"\\Delta": "Δ",
-    r"\\times": "×", r"\\cdot": "·", r"\\pm": "±", r"\\leq": "≤",
-    r"\\geq": "≥", r"\\neq": "≠", r"\\infty": "∞", r"\\approx": "≈",
+    r"\mu": "μ", r"\sigma": "σ", r"\bar{x}": "x̄", r"\alpha": "α",
+    r"\beta": "β", r"\theta": "θ", r"\pi": "π", r"\Delta": "Δ",
+    r"\times": "×", r"\cdot": "·", r"\pm": "±", r"\leq": "≤",
+    r"\geq": "≥", r"\neq": "≠", r"\infty": "∞", r"\approx": "≈",
 }
 
 
@@ -28,7 +28,7 @@ def _read_group(source, start):
 def _math_fragment(source):
     out, i = [], 0
     while i < len(source):
-        if source.startswith(r"\\frac", i):
+        if source.startswith(r"\frac", i):
             numerator, middle = _read_group(source, i + 5)
             denominator, end = _read_group(source, middle)
             if middle > i + 5 and end > middle:
@@ -44,7 +44,7 @@ def _math_fragment(source):
                 )
                 i = end
                 continue
-        if source.startswith(r"\\sqrt", i):
+        if source.startswith(r"\sqrt", i):
             value, end = _read_group(source, i + 5)
             if end > i + 5:
                 out.append(
@@ -53,7 +53,7 @@ def _math_fragment(source):
                 )
                 i = end
                 continue
-        if source.startswith(r"\\bar", i):
+        if source.startswith(r"\bar", i):
             value, end = _read_group(source, i + 4)
             if end > i + 4:
                 out.append(_math_fragment(value) + "̄")
@@ -131,16 +131,16 @@ def _inline_plain(source):
     rendered = html.escape(source, quote=True)
 
     # Emphasis, interview highlights, underline and strike-through.
-    rendered = re.sub(r"\\*\\*(.+?)\\*\\*", r"<b>\\1</b>", rendered)
+    rendered = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", rendered)
     rendered = re.sub(
         r"==(.+?)==",
         r"<span style='background:#71551c;color:#fff0bd;padding:1px 4px;"
-        r"border-radius:3px;'><b>\\1</b></span>",
+        r"border-radius:3px;'><b>\1</b></span>",
         rendered,
     )
-    rendered = re.sub(r"__(.+?)__", r"<u>\\1</u>", rendered)
-    rendered = re.sub(r"~~(.+?)~~", r"<s>\\1</s>", rendered)
-    rendered = re.sub(r"(?<!\\*)\\*([^*\\n]+)\\*(?!\\*)", r"<i>\\1</i>", rendered)
+    rendered = re.sub(r"__(.+?)__", r"<u>\1</u>", rendered)
+    rendered = re.sub(r"~~(.+?)~~", r"<s>\1</s>", rendered)
+    rendered = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<i>\1</i>", rendered)
 
     for key, value in placeholders.items():
         rendered = rendered.replace(html.escape(key), value)
@@ -149,7 +149,7 @@ def _inline_plain(source):
 
 def _inline(value):
     # Split math expressions before escaping ordinary text.
-    pieces = re.split(r"(\\$\\$.*?\\$\\$|\\$.*?\\$)", value)
+    pieces = re.split(r"(\$\$.*?\$\$|\$.*?\$)", value)
     rendered = []
     for piece in pieces:
         if piece.startswith("$$") and piece.endswith("$$"):
@@ -292,14 +292,14 @@ def format_response_html(text):
             render_table(table_lines)
             continue
 
-        if re.fullmatch(r"(?:---+|\\*\\*\\*|___+)", line):
+        if re.fullmatch(r"(?:---+|\*\*\*|___+)", line):
             flush_paragraph()
             close_list()
             out.append("<hr style='border:0;border-top:1px solid #405875;margin:10px 0;'>")
             index += 1
             continue
 
-        quote = re.match(r"^>\\s?(.*)$", line)
+        quote = re.match(r"^>\s?(.*)$", line)
         if quote:
             flush_paragraph()
             close_list()
@@ -311,8 +311,8 @@ def format_response_html(text):
             index += 1
             continue
 
-        bullet = re.match(r"^(?:[-*•])\\s+(.+)$", line)
-        numbered = re.match(r"^\\d+[.)]\\s+(.+)$", line)
+        bullet = re.match(r"^(?:[-*•])\s+(.+)$", line)
+        numbered = re.match(r"^\d+[.)]\s+(.+)$", line)
         if bullet or numbered:
             flush_paragraph()
             kind = "ul" if bullet else "ol"
@@ -329,7 +329,7 @@ def format_response_html(text):
             index += 1
             continue
 
-        heading = re.match(r"^(#{1,4})\\s+(.+)$", line)
+        heading = re.match(r"^(#{1,4})\s+(.+)$", line)
         if heading:
             flush_paragraph()
             close_list()

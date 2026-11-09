@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.answer_generator import AnswerGenerator
-from core.ollama_client import OllamaClient
+from core.gemini_client import GeminiClient
 from core.resume_rag import ResumeRAG
 from ui.macos_window_privacy import set_window_capture_exclusion
 from ui.rich_text import format_response_html
@@ -109,9 +109,9 @@ class MainWindow(QMainWindow):
         """)
 
         self.pool = QThreadPool.globalInstance()
-        self.ollama = OllamaClient()
-        self.rag = ResumeRAG(self.ollama)
-        self.generator = AnswerGenerator(self.ollama, self.rag)
+        self.gemini = GeminiClient()
+        self.rag = ResumeRAG(self.gemini, persist_dir="vector_db_gemini")
+        self.generator = AnswerGenerator(self.gemini, self.rag)
         self.history = []
         self._streamed_answer = ""
         self._capture_privacy_enabled = True
@@ -160,13 +160,13 @@ class MainWindow(QMainWindow):
         title_group.setSpacing(2)
         title = QLabel("Interview Copilot")
         title.setObjectName("appTitle")
-        subtitle = QLabel("Your local interview assistant")
+        subtitle = QLabel("Gemini-powered interview assistant")
         subtitle.setObjectName("appSubtitle")
         title_group.addWidget(title)
         title_group.addWidget(subtitle)
         header.addLayout(title_group)
         header.addStretch()
-        self.status = QLabel("Checking Ollama…")
+        self.status = QLabel("Connecting to Gemini…")
         self.status.setObjectName("status")
         header.addWidget(self.status)
         root.addLayout(header)
@@ -177,7 +177,7 @@ class MainWindow(QMainWindow):
         model_label = QLabel("MODEL")
         model_label.setObjectName("sectionHint")
         self.model = QComboBox()
-        self.model.addItems(["qwen3:8b"])
+        self.model.addItems(["gemini-3.8-flash"])
         self.model.setMinimumWidth(150)
 
         upload = QPushButton("Upload resume")
@@ -412,12 +412,20 @@ class MainWindow(QMainWindow):
             self.audio_hint.setText("Microphone selection failed: " + str(exc))
 
     def _check_server(self):
-        worker = FunctionWorker(self.ollama.health)
+        worker = FunctionWorker(self.gemini.health)
         worker.signals.result.connect(self._server_ok)
         worker.signals.error.connect(
-            lambda _error: self._set_status("Ollama offline — run ollama serve", warning=True)
+            lambda error: self._gemini_unavailable(error)
         )
         self.pool.start(worker)
+
+    def _gemini_unavailable(self, error):
+        message = str(error)
+        if "API key not found" in message:
+            self._set_status("Gemini API key missing — configure .env", warning=True)
+        else:
+            self._set_status("Gemini unavailable — check connection / key", warning=True)
+        self.status.setToolTip(message)
 
     def _set_status(self, text, warning=False):
         self.status.setText(text)
@@ -428,13 +436,13 @@ class MainWindow(QMainWindow):
         )
 
     def _server_ok(self, data):
-        self._set_status("Ollama connected")
+        self._set_status("Gemini connected")
         names = [model.get("name") for model in data.get("models", []) if model.get("name")]
         if names:
             self.model.clear()
             self.model.addItems(names)
-            if "qwen3:8b" in names:
-                self.model.setCurrentText("qwen3:8b")
+            if self.gemini.chat_model in names:
+                self.model.setCurrentText(self.gemini.chat_model)
 
     def upload_resume(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -443,14 +451,14 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
-        self._set_status("Indexing resume…")
+        self._set_status("Embedding resume with Gemini…")
         worker = FunctionWorker(self.rag.add_file, path)
         worker.signals.result.connect(lambda count: self._resume_done(path, count))
         worker.signals.error.connect(self._show_error)
         self.pool.start(worker)
 
     def _resume_done(self, path, count):
-        self._set_status("Resume indexed")
+        self._set_status("Resume indexed with Gemini")
         self._append("Resume", f"Loaded **{Path(path).name}** · indexed {count} searchable sections.")
         QMessageBox.information(
             self, "Resume ready",
@@ -461,7 +469,7 @@ class MainWindow(QMainWindow):
         question = self.question.text().strip()
         if not question:
             return
-        self.ollama.chat_model = self.model.currentText() or "qwen3:8b"
+        self.gemini.chat_model = self.model.currentText() or GeminiClient.DEFAULT_CHAT_MODEL
         self.question.clear()
         self._append("You", question)
         self.ask_button.setEnabled(False)

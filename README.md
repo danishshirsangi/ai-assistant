@@ -47,7 +47,13 @@ brew install python@3.12
 xcode-select --install
 ```
 
-Create a Gemini API key at https://aistudio.google.com/apikey. This experiment sends resume text for embeddings and sends questions, transcript context, chat history and retrieved resume excerpts to Google Gemini. Do not use confidential work or personal data unless you have reviewed Google's API data-use terms.
+Create a Gemini API key at https://aistudio.google.com/apikey. Then create your local environment file (never commit it):
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and replace `your_google_ai_studio_api_key` with your key. The `.env` file is ignored by Git. This experiment sends resume text for embeddings and sends questions, transcript context, chat history and retrieved resume excerpts to Google Gemini. Do not use confidential work or personal data unless you have reviewed Google's API data-use terms.
 
 ## 2. Clone and install Python dependencies
 

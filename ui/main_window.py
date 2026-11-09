@@ -435,7 +435,7 @@ class MainWindow(QMainWindow):
             if warning else ""
         )
 
-    def _server_ok(self, data):
+    def _gemini_ok(self, data):
         self._set_status("Gemini connected")
         names = [model.get("name") for model in data.get("models", []) if model.get("name")]
         if names:

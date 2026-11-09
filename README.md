@@ -7,7 +7,7 @@ A cloud-assisted macOS desktop copilot experiment for meeting and interview assi
 ## Features
 
 - Native desktop UI built with Python and PySide6.
-- Cloud answer generation and resume embeddings through the Gemini Developer API (Gemini 3.8 Flash + Gemini Embedding 2).
+- Cloud answer generation and resume embeddings through the Gemini Developer API (Gemini 3.8 Flash + Gemini Embedding 2). Gemini is configured with LOW thinking effort to prioritize response latency for live interview use.
 - Resume/document indexing with SQLite-backed retrieval.
 - Microphone capture with selectable input device.
 - macOS system-audio capture through Apple's ScreenCaptureKit.

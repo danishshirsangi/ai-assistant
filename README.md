@@ -60,7 +60,8 @@ Open `.env` and replace `your_google_ai_studio_api_key` with your key. The `.env
 ```bash
 git clone https://github.com/danishshirsangi/ai-assistant.git
 cd ai-assistant
-git switch experiment/gemini-api-cloud
+git fetch origin
+git switch --track -c experiment/gemini-api-cloud origin/experiment/gemini-api-cloud
 ```
 
 Create and activate a Python 3.12 virtual environment:

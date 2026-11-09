@@ -1,4 +1,4 @@
-# Interview Copilot
+# AI Meeting Assistant
 
 A cloud-assisted macOS desktop copilot experiment for meeting and interview assistance. Audio capture and transcription remain local; Gemini handles answers and resume semantic search. It captures your microphone and Mac system audio, transcribes both tracks locally with MLX Whisper, and streams generated responses directly into a single always-on-top main window.
 
@@ -13,7 +13,7 @@ A cloud-assisted macOS desktop copilot experiment for meeting and interview assi
 - macOS system-audio capture through Apple's ScreenCaptureKit.
 - Local transcription with MLX Whisper on Apple Silicon.
 - **Recording hotkey:** press **Control + Option + R** once to start recording; press it again to stop.
-- **Window visibility hotkey:** press **Control + Option + H** to hide Interview Copilot; press it again to restore the window.
+- **Window visibility hotkey:** press **Control + Option + H** to hide AI Meeting Assistant; press it again to restore the window.
 - Live token-by-token answers appear in the main window for both typed questions and interview transcripts.
 - Rich answer formatting supports Markdown headings, bold, italic, underline, highlights, strikethrough, lists, tables, blockquotes, links, inline/fenced code and common LaTeX.
 - Visible Start/Stop button as a fallback.
@@ -137,7 +137,7 @@ On first transcription, MLX Whisper downloads the configured model from Hugging 
 
 ## 5. Main window and live answers
 
-Interview Copilot uses one application window; it does not create a separate floating answer overlay. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
+AI Meeting Assistant uses one application window; it does not create a separate floating answer overlay. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
 
 Typed questions and questions extracted from interview transcripts stream token by token into the **Latest answer** pane while Gemini generates them. Markdown styling is refreshed during streaming and finalized when generation completes. The renderer supports headings, **bold**, *italic*, underline, ==highlights==, ~~strikethrough~~, numbered/bulleted lists, tables, blockquotes, links, inline/fenced code, and common LaTeX math. The full completed answer is also added to the conversation history.
 
@@ -157,7 +157,7 @@ The global shortcuts use `pynput`. macOS may require Accessibility and Input Mon
 
 ### Hide and restore the main window
 
-- Press **Control + Option + H** to hide Interview Copilot.
+- Press **Control + Option + H** to hide AI Meeting Assistant.
 - Press **Control + Option + H** again to show it, bring it forward and restore the always-on-top window.
 - Hiding the window does not close the app or stop audio capture, transcription or generation.
 - The **Hide window** button is an in-app alternative. When the app is hidden, use the global shortcut to restore it.
@@ -191,7 +191,7 @@ Menu names can vary slightly by macOS version. If system audio does not start, v
 
 ## 8. Capture privacy setting
 
-The main window's **Capture privacy** toggle applies a macOS window-sharing setting to the single Interview Copilot window.
+The main window's **Capture privacy** toggle applies a macOS window-sharing setting to the single AI Meeting Assistant window.
 
 - ON requests exclusion from compatible macOS capture APIs.
 - OFF restores the normal sharing setting.

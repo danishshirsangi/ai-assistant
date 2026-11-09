@@ -1,21 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#172554"/>
-      <stop offset="1" stop-color="#0f766e"/>
+      <stop offset="0" stop-color="#111b14"/>
+      <stop offset="1" stop-color="#030705"/>
     </linearGradient>
-    <linearGradient id="wave" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#99f6e4"/>
-      <stop offset="1" stop-color="#2dd4bf"/>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c7ffd0"/>
+      <stop offset="0.55" stop-color="#72f58b"/>
+      <stop offset="1" stop-color="#24b64b"/>
     </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect x="20" y="20" width="472" height="472" rx="112" fill="url(#bg)"/>
-  <path d="M112 150a34 34 0 0 1 34-34h220a34 34 0 0 1 34 34v158a34 34 0 0 1-34 34H250l-70 54v-54h-34a34 34 0 0 1-34-34z" fill="#f8fafc" opacity=".98"/>
-  <rect x="148" y="215" width="24" height="62" rx="12" fill="url(#wave)"/>
-  <rect x="190" y="185" width="24" height="122" rx="12" fill="url(#wave)"/>
-  <rect x="232" y="163" width="24" height="166" rx="12" fill="url(#wave)"/>
-  <rect x="274" y="194" width="24" height="104" rx="12" fill="url(#wave)"/>
-  <rect x="316" y="218" width="24" height="58" rx="12" fill="url(#wave)"/>
-  <circle cx="365" cy="365" r="57" fill="#f59e0b" stroke="#fff" stroke-width="12"/>
-  <path d="M365 334v36m0 0 18-18m-18 18-18-18" fill="none" stroke="#172554" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="18" y="18" width="476" height="476" rx="128" fill="url(#bg)" stroke="#4b9f5b" stroke-opacity=".48" stroke-width="3"/>
+  <rect x="49" y="49" width="414" height="414" rx="105" fill="none" stroke="#d8ffe0" stroke-opacity=".08" stroke-width="2"/>
+  <g filter="url(#glow)" fill="url(#green)">
+    <rect x="115" y="222" width="34" height="68" rx="17"/>
+    <rect x="174" y="174" width="34" height="164" rx="17"/>
+    <rect x="233" y="126" width="34" height="260" rx="17"/>
+    <rect x="292" y="182" width="34" height="148" rx="17"/>
+    <rect x="351" y="224" width="34" height="64" rx="17"/>
+  </g>
+  <path d="M112 408h288" stroke="#77ee8d" stroke-opacity=".3" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="400" cy="112" r="13" fill="#a3ffb2"/>
+  <circle cx="400" cy="112" r="24" fill="none" stroke="#83f798" stroke-opacity=".28" stroke-width="2"/>
 </svg>

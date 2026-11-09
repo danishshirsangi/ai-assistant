@@ -161,7 +161,7 @@ cd ~/Desktop
 Clone the Gemini version of the repository:
 
 ```bash
-git clone --branch experiment/gemini-api-cloud --single-branch https://github.com/danishshirsangi/ai-assistant.git
+git clone https://github.com/danishshirsangi/ai-assistant.git
 ```
 
 Enter the project folder:
@@ -179,10 +179,10 @@ git branch --show-current
 It should print:
 
 ```text
-experiment/gemini-api-cloud
+main
 ```
 
-> **Important:** The Gemini implementation is on the `experiment/gemini-api-cloud` branch. Do not clone the repository's default `main` branch if you want to run this version.
+> **Important:** The official application is on the `main` branch. A normal clone downloads this version automatically.
 
 ---
 
@@ -586,7 +586,7 @@ The first transcription may download the Whisper model. Keep the Mac connected t
 
 ### J. The application window is blank or does not display correctly
 
-Update to the latest commit on `experiment/gemini-api-cloud`, activate `.venv` and relaunch. If it remains blank, run:
+Update to the latest commit on `main`, activate `.venv` and relaunch. If it remains blank, run:
 
 ```bash
 python -X faulthandler main.py
@@ -617,8 +617,8 @@ When a new version is pushed to the Gemini branch, open Terminal and run:
 
 ```bash
 cd ~/Desktop/ai-assistant
-git switch experiment/gemini-api-cloud
-git pull origin experiment/gemini-api-cloud
+git switch main
+git pull origin main
 source .venv/bin/activate
 ```
 
@@ -647,7 +647,7 @@ Use this checklist after following the full guide:
 - [ ] Xcode Command Line Tools installed.
 - [ ] Homebrew installed and working.
 - [ ] Python 3.12 installed.
-- [ ] Repository cloned on `experiment/gemini-api-cloud`.
+- [ ] Repository cloned on `main`.
 - [ ] Virtual environment created and activated.
 - [ ] Both Python requirements files installed.
 - [ ] Gemini API key added to the root `.env` file.

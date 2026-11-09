@@ -734,6 +734,9 @@ class MainWindow(QMainWindow):
     def _audio_error(self, message):
         self._set_status("Audio error", warning=True)
         self.audio_hint.setText(message)
+        self.record_button.setProperty("recording", False)
+        self.record_button.style().unpolish(self.record_button)
+        self.record_button.style().polish(self.record_button)
         self.record_button.setText("Start recording")
 
     def _answer_done(self, question_id, question, answer):

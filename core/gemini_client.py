@@ -108,13 +108,18 @@ class GeminiClient:
         if not prompt:
             raise ValueError("No user prompt was provided to Gemini.")
 
+        # Keep the temperature argument for compatibility with AnswerGenerator,
+        # but leave Gemini 3.8 sampling parameters at their recommended defaults.
         request = {
             "model": self.chat_model,
             "input": prompt,
             "system_instruction": system_instruction or None,
             # Do not store Interaction objects for conversation-history management.
             "store": False,
-            "generation_config": {"thinking_level": "medium"},
+            "generation_config": {
+                "thinking_level": "medium",
+                "max_output_tokens": 2048,
+            },
         }
 
         if on_chunk is None:

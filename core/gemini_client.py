@@ -58,30 +58,27 @@ class GeminiClient:
                 title = titles[index] if index < len(titles) else "none"
                 prepared.append(f"title: {title} | text: {text}")
 
-        contents = [
-            types.Content(
+        vectors = []
+        # Embedding 2 aggregates multiple inputs into one vector. Request each
+        # resume chunk separately so the SQLite index keeps one vector per chunk.
+        for item in prepared:
+            content = types.Content(
                 role="user",
                 parts=[types.Part.from_text(text=item)],
             )
-            for item in prepared
-        ]
-
-        vectors = []
-        for start in range(0, len(contents), 32):
-            batch = contents[start:start + 32]
             result = client.models.embed_content(
                 model=self.embedding_model,
-                contents=batch,
+                contents=content,
                 config=types.EmbedContentConfig(
                     output_dimensionality=self.EMBEDDING_DIMENSIONS
                 ),
             )
             embeddings = getattr(result, "embeddings", None) or []
-            if len(embeddings) != len(batch):
+            if len(embeddings) != 1:
                 raise RuntimeError(
                     "Gemini returned an unexpected number of resume embeddings."
                 )
-            vectors.extend(embedding.values for embedding in embeddings)
+            vectors.append(embeddings[0].values)
 
         return vectors
 

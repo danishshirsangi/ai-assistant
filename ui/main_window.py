@@ -672,7 +672,7 @@ class MainWindow(QMainWindow):
     def _audio_answer_done(self, question_id, question, result):
         transcript, answer = result
         self.history.extend([
-            {"role": "user", "content": "Live interview transcript:\\n" + transcript},
+            {"role": "user", "content": "Live interview transcript:\n" + transcript},
             {"role": "assistant", "content": answer},
         ])
         self._finish_answer_stream(question_id, answer)

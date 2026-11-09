@@ -2,17 +2,17 @@ import re
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QPushButton, QSplitter, QTextBrowser,
-    QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
+    QListWidget, QListWidgetItem, QGraphicsDropShadowEffect, QVBoxLayout, QWidget,
 )
 
 from core.answer_generator import AnswerGenerator
 from core.gemini_client import GeminiClient
 from core.resume_rag import ResumeRAG
-from ui.macos_window_privacy import set_window_capture_exclusion
+from ui.macos_window_privacy import apply_window_glass_effect, set_window_capture_exclusion
 from ui.rich_text import format_response_html
 from ui.worker import FunctionWorker
 
@@ -44,14 +44,14 @@ class MainWindow(QMainWindow):
             }
             QWidget#appRoot {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #050806, stop:0.52 #09110c, stop:1 #0b1710);
+                    stop:0 rgba(5, 8, 6, 224), stop:0.52 rgba(9, 17, 12, 218), stop:1 rgba(11, 23, 16, 224));
                 border: 1px solid rgba(125, 255, 155, 38);
                 border-radius: 22px;
             }
             QLabel { color: #ecf7ef; background: transparent; }
             QFrame#surfacePanel {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 rgba(21, 34, 25, 232), stop:1 rgba(10, 19, 13, 224));
+                    stop:0 rgba(21, 34, 25, 205), stop:1 rgba(10, 19, 13, 198));
                 border: 1px solid rgba(143, 255, 171, 52);
                 border-top: 1px solid rgba(190, 255, 205, 78);
                 border-radius: 17px;
@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
                 border: 1px solid #326d41; outline: none;
             }
             QListWidget {
-                background: rgba(7, 16, 10, 205); color: #cfe9d4;
+                background: rgba(7, 16, 10, 182); color: #cfe9d4;
                 border: 1px solid rgba(112, 200, 132, 50);
                 border-radius: 12px; padding: 7px; outline: none; font-size: 12px;
             }
@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
                 border: 1px solid rgba(126, 244, 150, 135);
             }
             QTextBrowser {
-                background: rgba(6, 14, 9, 190); color: #e9f5eb;
+                background: rgba(6, 14, 9, 178); color: #e9f5eb;
                 border: 1px solid rgba(112, 200, 132, 56);
                 border-radius: 12px; padding: 14px;
                 selection-background-color: #267b3f; font-size: 13px;
@@ -173,12 +173,22 @@ class MainWindow(QMainWindow):
         self._stream_render_timer.timeout.connect(self._render_streamed_answer)
 
         self._build_ui()
+        # Use native macOS vibrancy when available; Qt translucency is the fallback.
+        try:
+            apply_window_glass_effect(self)
+        except Exception:
+            pass
         self._setup_audio()
         self._check_server()
 
     def _make_panel(self, title, hint=None):
         panel = QFrame()
         panel.setObjectName("surfacePanel")
+        shadow = QGraphicsDropShadowEffect(panel)
+        shadow.setBlurRadius(24)
+        shadow.setOffset(0, 7)
+        shadow.setColor(QColor(0, 0, 0, 115))
+        panel.setGraphicsEffect(shadow)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(12, 10, 12, 12)
         layout.setSpacing(7)
@@ -703,6 +713,9 @@ class MainWindow(QMainWindow):
         self._set_status("Ready")
 
     def _recording_changed(self, active):
+        self.record_button.setProperty("recording", bool(active))
+        self.record_button.style().unpolish(self.record_button)
+        self.record_button.style().polish(self.record_button)
         self.record_button.setText("Stop recording" if active else "Start recording")
         self.audio_hint.setText(
             "Recording · ⌃⌥R stop · ⌃⌥H hide window"

@@ -473,7 +473,7 @@ class MainWindow(QMainWindow):
         self.question.clear()
         self._append("You", question)
         self.ask_button.setEnabled(False)
-        self._set_status("Thinking…")
+        self._set_status("Preparing Gemini response…")
         self._begin_answer_stream()
         worker = FunctionWorker(
             self.generator.answer,

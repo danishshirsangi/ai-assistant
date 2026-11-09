@@ -1,3 +1,4 @@
+import logging
 import sys
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
@@ -5,6 +6,10 @@ from pathlib import Path
 from ui.main_window import MainWindow
 
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("Interview Copilot")
     # Run as a macOS accessory app: no Dock icon or normal Cmd-Tab entry.

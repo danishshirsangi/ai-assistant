@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
             QMainWindow, QWidget {
                 background: #0c1422;
                 color: #e8eef8;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
             }
             QLabel { color: #e8eef8; background: transparent; }
             QFrame#surfacePanel {

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class GeminiClient:
     """Gemini cloud chat and embeddings client for the cloud experiment."""
 
-    DEFAULT_CHAT_MODEL = "gemini-3.8-flash"
+    DEFAULT_CHAT_MODEL = "gemini-3.5-flash-lite"
     DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
     EMBEDDING_DIMENSIONS = 768
 
@@ -23,9 +23,16 @@ class GeminiClient:
         load_dotenv(project_root / ".env", override=False)
 
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.chat_model = (
-            chat_model or os.getenv("GEMINI_MODEL") or self.DEFAULT_CHAT_MODEL
-        )
+        configured_model = chat_model or os.getenv("GEMINI_MODEL")
+        # The previous experiment defaulted to 3.8 Flash, whose free-tier
+        # output tokens are not available. Migrate that default to Flash-Lite.
+        if configured_model == "gemini-3.8-flash":
+            logger.warning(
+                "Switching previous Gemini 3.8 Flash setting to %s for free-tier output access",
+                self.DEFAULT_CHAT_MODEL,
+            )
+            configured_model = None
+        self.chat_model = configured_model or self.DEFAULT_CHAT_MODEL
         self.embedding_model = (
             embedding_model
             or os.getenv("GEMINI_EMBEDDING_MODEL")
@@ -116,14 +123,14 @@ class GeminiClient:
 
         config = types.GenerateContentConfig(
             system_instruction=system_instruction or None,
-            thinking_config=types.ThinkingConfig(thinking_level="low"),
+            thinking_config=types.ThinkingConfig(thinking_level="minimal"),
         )
 
         started = time.monotonic()
         first_text_at = None
         parts = []
         logger.info(
-            "Starting Gemini request: model=%s, prompt_chars=%s, thinking=low",
+            "Starting Gemini request: model=%s, prompt_chars=%s, thinking=minimal",
             self.chat_model,
             len(prompt),
         )

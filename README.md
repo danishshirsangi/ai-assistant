@@ -1,3 +1,9 @@
+
+
+https://github.com/user-attachments/assets/e6f60759-1019-4020-9b90-d6465fca0141
+
+
+
 # AI Meeting Assistant
 
 A macOS desktop assistant for interview preparation and meeting support. It can accept typed questions or record your microphone and Mac system audio, transcribe the audio locally with Whisper, and use Google Gemini to generate an answer.

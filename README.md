@@ -309,3 +309,8 @@ If dependencies changed in a later update, reinstall the requirements files.
 ## License
 
 No license has been added yet. Contact the repository owner before redistributing.
+
+
+### Qt worker lifecycle
+
+Background tasks use `QRunnable` with automatic deletion disabled. The main window retains each worker until its result/error and completion signals have been delivered, then releases it. This avoids deleting the runnable and its Python-owned signal object while queued GUI updates are still pending.

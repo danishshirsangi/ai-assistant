@@ -2,13 +2,13 @@ from core.prompts import build_messages
 
 
 class AnswerGenerator:
-    def __init__(self, ollama, rag):
-        self.ollama = ollama
+    def __init__(self, llm_client, rag):
+        self.llm_client = llm_client
         self.rag = rag
 
     def answer(self, question, history, on_chunk=None):
         chunks = self.rag.retrieve(question)
-        return self.ollama.chat(
+        return self.llm_client.chat(
             build_messages(question, chunks, history),
             on_chunk=on_chunk,
         )
@@ -26,7 +26,7 @@ class AnswerGenerator:
             "spoken aloud; avoid a long preamble.\n\nLive transcript:\n" + transcript
         )
         chunks = self.rag.retrieve(transcript)
-        answer = self.ollama.chat(
+        answer = self.llm_client.chat(
             build_messages(instruction, chunks, history),
             temperature=0.25,
             on_chunk=on_chunk,

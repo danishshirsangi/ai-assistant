@@ -1,13 +1,13 @@
 # Interview Copilot
 
-A local-first macOS desktop copilot for meeting and interview assistance. It captures your microphone and Mac system audio, transcribes both tracks locally with MLX Whisper, and streams generated responses directly into a single always-on-top main window.
+A cloud-assisted macOS desktop copilot experiment for meeting and interview assistance. Audio capture and transcription remain local; Gemini handles answers and resume semantic search. It captures your microphone and Mac system audio, transcribes both tracks locally with MLX Whisper, and streams generated responses directly into a single always-on-top main window.
 
 > **Privacy note:** Only record meetings when participant consent, company policy and applicable law permit it. The capture-privacy window setting is a best-effort macOS API hint, not a guarantee that every meeting or screen-sharing application will hide the windows.
 
 ## Features
 
 - Native desktop UI built with Python and PySide6.
-- Local LLM and embeddings through Ollama.
+- Cloud answer generation and resume embeddings through the Gemini Developer API (Gemini 3.8 Flash + Gemini Embedding 2).
 - Resume/document indexing with SQLite-backed retrieval.
 - Microphone capture with selectable input device.
 - macOS system-audio capture through Apple's ScreenCaptureKit.
@@ -18,7 +18,7 @@ A local-first macOS desktop copilot for meeting and interview assistance. It cap
 - Rich answer formatting supports Markdown headings, bold, italic, underline, highlights, strikethrough, lists, tables, blockquotes, links, inline/fenced code and common LaTeX.
 - Visible Start/Stop button as a fallback.
 - Transcript labels distinguish microphone audio from other participants/system audio.
-- Local transcript refinement and answer generation.
+- Local audio transcription; cloud-based answer generation and resume retrieval.
 - Single main application window with an always-on-top setting and a dedicated live answer pane.
 - Adaptive business-case and executive/managerial response frameworks.
 - macOS accessory-app mode (no Dock icon or normal Cmd-Tab entry).
@@ -32,7 +32,7 @@ Recommended setup:
 - Apple Silicon Mac (MLX Whisper acceleration).
 - **Python 3.12** recommended for the current native dependency stack. Avoid using a very new Python release until PySide6, MLX and audio wheels are confirmed compatible.
 - Xcode Command Line Tools.
-- Ollama installed and running locally.
+- A Gemini API key from Google AI Studio.
 
 Python 3.12 is recommended because MLX and other compiled dependencies are tied to supported Python/macOS/architecture combinations. The app may install on other versions, but installation success does not guarantee native runtime stability.
 
@@ -47,27 +47,14 @@ brew install python@3.12
 xcode-select --install
 ```
 
-Install Ollama: https://ollama.com/download
-
-Download the default models:
-
-```bash
-ollama pull qwen3:8b
-ollama pull nomic-embed-text
-```
-
-Start the Ollama service if it is not already running:
-
-```bash
-ollama serve
-```
+Create a Gemini API key at https://aistudio.google.com/apikey. This experiment sends resume text for embeddings and sends questions, transcript context, chat history and retrieved resume excerpts to Google Gemini. Do not use confidential work or personal data unless you have reviewed Google's API data-use terms.
 
 ## 2. Clone and install Python dependencies
 
 ```bash
 git clone https://github.com/danishshirsangi/ai-assistant.git
 cd ai-assistant
-git switch feature/main-window-toggle-rich-formatting
+git switch experiment/gemini-api-cloud
 ```
 
 Create and activate a Python 3.12 virtual environment:
@@ -97,7 +84,8 @@ The audio requirements include:
 | `mlx-whisper` | Local Whisper transcription on Apple Silicon |
 | `pyobjc-framework-Cocoa` | macOS window capture privacy API |
 | `PySide6` | Desktop UI and Qt event loop |
-| `requests` | Local Ollama HTTP API |
+| `google-genai` | Gemini Developer API client |
+| `python-dotenv` | Load the API key from `.env` |
 | `PyMuPDF` | PDF text extraction |
 | `python-docx` | DOCX text extraction |
 
@@ -130,13 +118,13 @@ From the project root, with the virtual environment active:
 python main.py
 ```
 
-On first transcription, MLX Whisper downloads the configured model from Hugging Face. This is a one-time model download; inference is local afterwards. Ollama models are also stored locally.
+On first transcription, MLX Whisper downloads the configured model from Hugging Face. Transcription remains local afterwards. Gemini inference and resume embeddings require internet access and a Gemini API key.
 
 ## 5. Main window and live answers
 
 Interview Copilot uses one application window; it does not create a separate floating answer overlay. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
 
-Typed questions and questions extracted from interview transcripts stream token by token into the **Latest answer** pane while Ollama generates them. Markdown styling is refreshed during streaming and finalized when generation completes. The renderer supports headings, **bold**, *italic*, underline, ==highlights==, ~~strikethrough~~, numbered/bulleted lists, tables, blockquotes, links, inline/fenced code, and common LaTeX math. The full completed answer is also added to the conversation history.
+Typed questions and questions extracted from interview transcripts stream token by token into the **Latest answer** pane while Gemini generates them. Markdown styling is refreshed during streaming and finalized when generation completes. The renderer supports headings, **bold**, *italic*, underline, ==highlights==, ~~strikethrough~~, numbered/bulleted lists, tables, blockquotes, links, inline/fenced code, and common LaTeX math. The full completed answer is also added to the conversation history.
 
 Press **Control + Option + H** to hide the entire main window while you work in other applications. Press the same shortcut again to restore it. Hiding the window does not quit the app or stop recording, transcription or answer generation. The in-app **Hide window** button provides the same action.
 
@@ -170,7 +158,7 @@ Use the Microphone dropdown to select the Mac's built-in microphone, a Bluetooth
 3. The Swift ScreenCaptureKit helper captures system audio.
 4. When Control + Option + R is pressed again, capture stops and both audio tracks are finalized.
 5. `mlx-whisper` transcribes the microphone and system-audio files locally.
-6. Transcript text is passed to the local Ollama workflow for cleanup/answer generation.
+6. Transcript text, the current question, conversation history and retrieved resume excerpts are sent to Gemini for answer generation.
 7. The temporary session directory is deleted after transcription, including when transcription raises an error.
 
 Audio files are written briefly to a uniquely named directory under the operating system's temporary folder. They are **not retained in the project directory**. A later app launch also attempts to remove abandoned session folders left by a crashed process. The transcript may remain visible in the app conversation; this cleanup concerns the intermediate audio files.
@@ -209,9 +197,10 @@ This is not a universal invisibility or anti-capture feature. Apple's current do
 │   ├── answer_generator.py        # Answer orchestration
 │   ├── context_refiner.py         # Transcript refinement
 │   ├── document_loader.py         # PDF/DOCX/TXT/MD extraction
-│   ├── ollama_client.py           # Local Ollama client
+│   ├── gemini_client.py           # Gemini cloud chat + embeddings client
+   ├── ollama_client.py           # Retained old client; unused in this experiment
 │   ├── prompts.py                 # Prompt templates
-│   └── resume_rag.py              # Local resume retrieval
+│   └── resume_rag.py              # Gemini embeddings + SQLite retrieval
 ├── ui/
 │   ├── macos_window_privacy.py    # macOS window capture setting
 │   ├── main_window.py             # Main PySide6 UI
@@ -277,28 +266,25 @@ python -X faulthandler main.py
 - Subsequent transcription runs locally using the downloaded model.
 - Inspect the audio file with FFmpeg if needed; FFmpeg is optional.
 
-### Ollama offline
+### Gemini API unavailable
 
-```bash
-ollama serve
-ollama list
-```
-
-Ensure `qwen3:8b` and `nomic-embed-text` are present.
+- Check that `.env` exists in the project root and contains a valid `GEMINI_API_KEY`.
+- Confirm `GEMINI_MODEL` is enabled for your Gemini API tier.
+- Check internet connectivity and the project's Gemini API rate limits.
 
 ## 11. Local data and security
 
-- Resume embeddings are stored locally in SQLite under `vector_db/`.
-- Ollama models and the MLX Whisper model are stored in their respective local model caches.
+- Resume text is sent to Gemini for embeddings; vectors are stored locally in SQLite under `vector_db_gemini/`. The previous Ollama `vector_db/` remains untouched.
+- Gemini receives the question, transcript context, chat history and retrieved resume excerpts for answer generation. MLX Whisper transcription remains local.
 - Audio recordings are temporary files and are removed after transcription.
 - Do not commit resumes, transcripts, temporary audio, credentials or local databases.
-- `data/`, `vector_db/`, virtual environments and Python cache files are ignored by Git.
+- `data/`, `vector_db/`, `vector_db_gemini/`, virtual environments and Python cache files are ignored by Git.
 
 ## 12. Updating
 
 ```bash
-git switch feature/main-window-toggle-rich-formatting
-git pull origin feature/main-window-toggle-rich-formatting
+git switch experiment/gemini-api-cloud
+git pull origin experiment/gemini-api-cloud
 source .venv/bin/activate
 python main.py
 ```

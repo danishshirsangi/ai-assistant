@@ -29,104 +29,126 @@ class MainWindow(QMainWindow):
         self.resize(1180, 850)
         self.setMinimumSize(900, 650)
 
+        # Glass-inspired black and green theme.
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setStyleSheet("""
-            QMainWindow, QWidget {
-                background: #0c1422;
-                color: #e8eef8;
+            QMainWindow {
+                background: transparent;
+                color: #ecf7ef;
                 font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
             }
-            QLabel { color: #e8eef8; background: transparent; }
-            QFrame#surfacePanel {
-                background: #131f31;
-                border: 1px solid #293b55;
-                border-radius: 12px;
+            QWidget {
+                color: #ecf7ef;
+                font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+                background: transparent;
             }
-            QLabel#appTitle { font-size: 23px; font-weight: 750; color: #f4f7ff; }
-            QLabel#appSubtitle { font-size: 11px; color: #91a4c0; }
-            QLabel#sectionTitle { font-size: 13px; font-weight: 700; color: #c9dafa; }
-            QLabel#sectionHint { font-size: 10px; color: #8195b2; }
+            QWidget#appRoot {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #050806, stop:0.52 #09110c, stop:1 #0b1710);
+                border: 1px solid rgba(125, 255, 155, 38);
+                border-radius: 22px;
+            }
+            QLabel { color: #ecf7ef; background: transparent; }
+            QFrame#surfacePanel {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(21, 34, 25, 232), stop:1 rgba(10, 19, 13, 224));
+                border: 1px solid rgba(143, 255, 171, 52);
+                border-top: 1px solid rgba(190, 255, 205, 78);
+                border-radius: 17px;
+            }
+            QLabel#appTitle { font-size: 25px; font-weight: 800; color: #f4fff6; }
+            QLabel#appSubtitle { font-size: 11px; color: #8aa993; }
+            QLabel#sectionTitle {
+                font-size: 11px; font-weight: 800; letter-spacing: 1.1px;
+                color: #b9eac4;
+            }
+            QLabel#sectionHint { font-size: 10px; color: #789181; }
             QLabel#status {
-                color: #b8d5ff;
-                background: #1a2e49;
-                border: 1px solid #345477;
-                border-radius: 10px;
-                padding: 5px 10px;
-                font-size: 11px;
-                font-weight: 650;
+                color: #a9f5b8; background: rgba(37, 113, 58, 60);
+                border: 1px solid rgba(101, 239, 132, 90);
+                border-radius: 12px; padding: 7px 12px;
+                font-size: 11px; font-weight: 700;
             }
             QLineEdit, QComboBox {
-                background: #17263a;
-                color: #edf4ff;
-                border: 1px solid #344a68;
-                border-radius: 8px;
-                padding: 8px 10px;
-                selection-background-color: #4169a5;
-                min-height: 18px;
+                background: rgba(10, 22, 14, 225); color: #effff2;
+                border: 1px solid rgba(119, 216, 140, 76);
+                border-radius: 11px; padding: 9px 12px;
+                selection-background-color: #267b3f; min-height: 19px;
             }
-            QLineEdit:focus, QComboBox:focus { border: 1px solid #83b2f1; }
+            QLineEdit:focus, QComboBox:focus {
+                border: 1px solid #69e985; background: rgba(15, 32, 19, 240);
+            }
+            QComboBox::drop-down { border: none; width: 25px; }
+            QComboBox QAbstractItemView {
+                background: #0c1710; color: #eaffee;
+                selection-background-color: #225e34;
+                border: 1px solid #326d41; outline: none;
+            }
             QListWidget {
-                background: #101b2b;
-                color: #dce8f8;
-                border: 1px solid #263a54;
-                border-radius: 8px;
-                padding: 6px;
-                outline: none;
-                font-size: 12px;
+                background: rgba(7, 16, 10, 205); color: #cfe9d4;
+                border: 1px solid rgba(112, 200, 132, 50);
+                border-radius: 12px; padding: 7px; outline: none; font-size: 12px;
             }
             QListWidget::item {
-                padding: 11px 10px;
-                margin: 2px 0;
-                border-radius: 7px;
+                padding: 12px 10px; margin: 3px 1px;
+                border-radius: 9px; border: 1px solid transparent;
             }
-            QListWidget::item:hover { background: #1a2a40; }
+            QListWidget::item:hover {
+                background: rgba(57, 120, 70, 65);
+                border: 1px solid rgba(115, 222, 139, 45);
+            }
             QListWidget::item:selected {
-                background: #263d5d;
-                color: #ffffff;
-                border-left: 3px solid #69a8f2;
+                background: rgba(52, 158, 78, 76); color: #f4fff6;
+                border: 1px solid rgba(126, 244, 150, 135);
             }
             QTextBrowser {
-                background: #101b2b;
-                color: #eaf1fc;
-                border: 1px solid #263a54;
-                border-radius: 8px;
-                padding: 10px;
-                selection-background-color: #4169a5;
-                font-size: 13px;
+                background: rgba(6, 14, 9, 190); color: #e9f5eb;
+                border: 1px solid rgba(112, 200, 132, 56);
+                border-radius: 12px; padding: 14px;
+                selection-background-color: #267b3f; font-size: 13px;
             }
             QPushButton {
-                background: #263d5d;
-                color: #f2f6ff;
-                border: 1px solid #405d83;
-                border-radius: 8px;
-                padding: 8px 12px;
-                font-size: 11px;
-                font-weight: 650;
+                background: rgba(20, 37, 25, 220); color: #dff5e3;
+                border: 1px solid rgba(123, 214, 143, 72);
+                border-radius: 11px; padding: 9px 14px;
+                font-size: 11px; font-weight: 700;
             }
-            QPushButton:hover { background: #34547e; }
-            QPushButton:pressed { background: #1c2f49; }
+            QPushButton:hover {
+                background: rgba(41, 83, 49, 238);
+                border-color: rgba(137, 245, 158, 145);
+            }
+            QPushButton:pressed { background: rgba(25, 67, 35, 245); }
             QPushButton:disabled {
-                color: #7b8ba2;
-                background: #1a2738;
-                border-color: #2b3b52;
+                color: #617568; background: rgba(17, 26, 19, 170);
+                border-color: rgba(95, 126, 101, 40);
             }
             QPushButton#primaryButton {
-                background: #3975bf;
-                border-color: #5792d8;
-                color: white;
-                padding-left: 17px;
-                padding-right: 17px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #8af59c, stop:1 #39c65f);
+                border: 1px solid #a6ffb3; color: #06110a;
+                font-weight: 800; padding-left: 18px; padding-right: 18px;
             }
-            QPushButton#primaryButton:hover { background: #4888d3; }
+            QPushButton#primaryButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #a1ffae, stop:1 #58dc78);
+            }
             QPushButton#recordButton {
-                background: #253c5a;
-                border-color: #49698e;
-                min-width: 112px;
+                background: rgba(38, 105, 54, 90);
+                border-color: rgba(111, 236, 137, 145);
+                color: #c8ffd2; min-width: 112px;
+            }
+            QPushButton#recordButton[recording="true"] {
+                background: rgba(139, 40, 40, 210);
+                border-color: #ff7979; color: #fff2f2;
             }
             QPushButton#hideButton {
-                background: #1b2a3e;
-                border-color: #334b68;
+                background: rgba(9, 18, 12, 205);
+                border-color: rgba(118, 198, 134, 60); color: #a9c9b0;
             }
-            QSplitter::handle { background: #1d2d43; height: 5px; width: 5px; }
+            QSplitter::handle {
+                background: rgba(108, 213, 131, 72);
+                width: 5px; margin: 5px 0; border-radius: 2px;
+            }
         """)
 
         self.pool = QThreadPool.globalInstance()
@@ -177,8 +199,9 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setContentsMargins(18, 16, 18, 16)
-        root.setSpacing(12)
+        central.setObjectName("appRoot")
+        root.setContentsMargins(22, 18, 22, 18)
+        root.setSpacing(14)
 
         # Header
         header = QHBoxLayout()
@@ -243,7 +266,7 @@ class MainWindow(QMainWindow):
         left_column = QWidget()
         left_layout = QVBoxLayout(left_column)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(10)
+        left_layout.setSpacing(12)
 
         questions_panel, questions_layout = self._make_panel(
             "QUESTIONS", "select one to revisit its answer"
@@ -274,7 +297,7 @@ class MainWindow(QMainWindow):
             "Your latest answer will appear here with headings, code and formatted content."
         )
         self.answer_view.setStyleSheet(
-            "QTextBrowser { font-size: 14px; padding: 14px; line-height: 1.5; }"
+            "QTextBrowser { font-size: 14px; padding: 18px; line-height: 1.55; border-radius: 14px; }"
         )
         answer_layout.addWidget(self.answer_view, 1)
 
@@ -285,7 +308,7 @@ class MainWindow(QMainWindow):
 
         # Recording controls
         recording_panel, recording_layout = self._make_panel(
-            "AUDIO INPUT", "Control + Option + R to start / stop"
+            "AUDIO INPUT", "⌃⌥R to toggle recording"
         )
         recording_row = QHBoxLayout()
         self.record_button = QPushButton("Start recording")
@@ -305,7 +328,7 @@ class MainWindow(QMainWindow):
         self.refresh_microphones_button.setToolTip("Refresh available microphones.")
         self.refresh_microphones_button.clicked.connect(self._refresh_microphones)
 
-        self.audio_hint = QLabel("Mic + system audio · local transcription")
+        self.audio_hint = QLabel("Mic + system audio · transcribed on device")
         self.audio_hint.setObjectName("sectionHint")
 
         recording_row.addWidget(self.record_button)

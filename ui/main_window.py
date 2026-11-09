@@ -2,11 +2,11 @@ import re
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
-from PySide6.QtGui import QColor, QIcon
+from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QPushButton, QSplitter, QTextBrowser,
-    QListWidget, QListWidgetItem, QGraphicsDropShadowEffect, QVBoxLayout, QWidget,
+    QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
 )
 
 from core.answer_generator import AnswerGenerator
@@ -29,7 +29,13 @@ class MainWindow(QMainWindow):
         self.resize(1180, 850)
         self.setMinimumSize(900, 650)
 
-        # Keep the native window opaque so the full interface paints reliably.
+        # Explicit opaque palette avoids blank/transparent Qt windows on macOS.
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setAutoFillBackground(True)
+        window_palette = self.palette()
+        window_palette.setColor(QPalette.ColorRole.Window, QColor("#050806"))
+        window_palette.setColor(QPalette.ColorRole.WindowText, QColor("#ecf7ef"))
+        self.setPalette(window_palette)
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #050806;
@@ -158,7 +164,7 @@ class MainWindow(QMainWindow):
         self._active_question_id = None
         self._selected_question_id = None
         self._streamed_answer = ""
-        self._capture_privacy_enabled = True
+        self._capture_privacy_enabled = False
         self.audio = None
 
         # Render Markdown periodically while streaming instead of rebuilding the
@@ -175,11 +181,6 @@ class MainWindow(QMainWindow):
     def _make_panel(self, title, hint=None):
         panel = QFrame()
         panel.setObjectName("surfacePanel")
-        shadow = QGraphicsDropShadowEffect(panel)
-        shadow.setBlurRadius(24)
-        shadow.setOffset(0, 7)
-        shadow.setColor(QColor(0, 0, 0, 115))
-        panel.setGraphicsEffect(shadow)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(12, 10, 12, 12)
         layout.setSpacing(7)
@@ -198,9 +199,14 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self):
         central = QWidget()
+        central.setObjectName("appRoot")
+        central.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        central.setAutoFillBackground(True)
+        central_palette = central.palette()
+        central_palette.setColor(QPalette.ColorRole.Window, QColor("#080d09"))
+        central.setPalette(central_palette)
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        central.setObjectName("appRoot")
         root.setContentsMargins(22, 18, 22, 18)
         root.setSpacing(14)
 
@@ -237,7 +243,7 @@ class MainWindow(QMainWindow):
         clear.setToolTip("Clear the question list, answers and session context")
         clear.clicked.connect(self.clear_chat)
 
-        self.privacy_button = QPushButton("Capture privacy: ON")
+        self.privacy_button = QPushButton("Capture privacy: OFF")
         self.privacy_button.setToolTip(
             "Best-effort request to exclude this window from compatible macOS capture APIs. "
             "This does not guarantee invisibility in meeting apps."

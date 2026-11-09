@@ -1,320 +1,676 @@
 # AI Meeting Assistant
 
-A cloud-assisted macOS desktop copilot experiment for meeting and interview assistance. Audio capture and transcription remain local; Gemini handles answers and resume semantic search. It captures your microphone and Mac system audio, transcribes both tracks locally with MLX Whisper, and streams generated responses directly into a single always-on-top main window.
+A macOS desktop assistant for interview preparation and meeting support. It can accept typed questions or record your microphone and Mac system audio, transcribe the audio locally with Whisper, and use Google Gemini to generate an answer.
 
-> **Privacy note:** Only record meetings when participant consent, company policy and applicable law permit it. The capture-privacy window setting is a best-effort macOS API hint, not a guarantee that every meeting or screen-sharing application will hide the windows.
+This README is a complete first-time installation guide for a Mac. Follow the steps in order. You do not need to know Python to install and run the application, but you will need to copy commands into Terminal.
 
-## Features
+> **Current implementation note:** typed questions each get their own selectable entry in the Questions sidebar. Audio is currently processed after you stop a recording; one recording session creates one sidebar entry and one generated answer. A single uninterrupted one-hour recording is not yet divided into separate entries for each question.
 
-- Native desktop UI built with Python and PySide6.
-- Cloud answer generation and resume embeddings through the Gemini Developer API (Gemini 3.5 Flash-Lite + Gemini Embedding 2). Gemini uses minimal thinking effort to prioritize response latency for live interview use.
-- Resume/document indexing with SQLite-backed retrieval.
-- Microphone capture with selectable input device.
-- macOS system-audio capture through Apple's ScreenCaptureKit.
-- Local transcription with MLX Whisper on Apple Silicon.
-- **Recording hotkey:** press **Control + Option + R** once to start recording; press it again to stop.
-- **Window visibility hotkey:** press **Control + Option + H** to hide AI Meeting Assistant; press it again to restore the window.
-- Live token-by-token answers appear in the main window for both typed questions and interview transcripts.
-- Rich answer formatting supports Markdown headings, bold, italic, underline, highlights, strikethrough, lists, tables, blockquotes, links, inline/fenced code and common LaTeX.
-- Visible Start/Stop button as a fallback.
-- Transcript labels distinguish microphone audio from other participants/system audio.
-- Local audio transcription; cloud-based answer generation and resume retrieval.
-- Single main application window with an always-on-top setting and a dedicated live answer pane.
-- Adaptive business-case and executive/managerial response frameworks.
-- macOS accessory-app mode (no Dock icon or normal Cmd-Tab entry).
-- Capture privacy toggle requests exclusion of the main window from compatible macOS capture APIs; this is best-effort and does not guarantee invisibility in screen sharing.
+---
 
-## Supported environment
+## 1. What the application does
 
-Recommended setup:
+- Provides a desktop interface built with Python and PySide6.
+- Uses **Gemini 3.5 Flash-Lite** to generate answers.
+- Uses **Gemini Embedding 2** to search relevant sections of your uploaded resume.
+- Stores the resume search index locally in SQLite so you do not have to upload the same resume every time you reopen the app.
+- Records microphone input and Mac system audio.
+- Uses **MLX Whisper locally on Apple Silicon** to transcribe the recorded audio.
+- Sends the transcript, question, conversation context and relevant resume excerpts to Gemini to generate an answer.
+- Displays questions in a selectable sidebar. Selecting a question displays its saved answer.
+- Provides keyboard shortcuts to start/stop recording and hide/restore the app.
 
-- macOS 13 or newer (ScreenCaptureKit system-audio capture).
-- Apple Silicon Mac (MLX Whisper acceleration).
-- **Python 3.12** recommended for the current native dependency stack. Avoid using a very new Python release until PySide6, MLX and audio wheels are confirmed compatible.
-- Xcode Command Line Tools.
-- A Gemini API key from Google AI Studio.
+### Important: what is and is not live
 
-Python 3.12 is recommended because MLX and other compiled dependencies are tied to supported Python/macOS/architecture combinations. The app may install on other versions, but installation success does not guarantee native runtime stability.
+The current audio workflow is **record → stop → transcribe locally → send transcript to Gemini → display answer**. It does not continuously detect every interviewer question during a call. It also does not show a live transcript in the UI. See [Current limitations](#14-current-limitations) before relying on it in an interview.
 
-## 1. Install system tools
+---
 
-Install Homebrew if it is not already installed: https://brew.sh/
+## 2. Before you start: system requirements
 
-Install Python 3.12 and Xcode Command Line Tools:
+This version is designed for:
+
+- **Mac with Apple Silicon**: M1, M2, M3, M4, M5 or later.
+- **macOS 13 (Ventura) or later**.
+- **Python 3.12**.
+- Internet connection for installation, Gemini requests and the first Whisper model download.
+- Permission to install developer command-line tools and applications on your Mac.
+
+Check your Mac before installing:
+
+1. Open **Finder → Applications → Utilities → Terminal**.
+2. Open Terminal.
+3. Copy and run:
 
 ```bash
-brew install python@3.12
+uname -m
+sw_vers -productVersion
+```
+
+For this audio-enabled version, `uname -m` should print `arm64`. The macOS version should be 13 or newer.
+
+---
+
+## 3. Applications and tools you need
+
+You do not need to install a large development environment. These are the tools used by the current code.
+
+| Tool | Required? | Why it is needed |
+|---|---|---|
+| **Terminal** | Yes | Included with macOS. Used to install, configure and launch the app. |
+| **Xcode Command Line Tools** | Yes | Provides Git, Swift compiler (`swiftc`) and Apple build tools. The app compiles its small Swift audio-capture helper the first time you record. |
+| **Homebrew** | Recommended | macOS package manager used here to install Python 3.12. |
+| **Python 3.12** | Yes | Runs the desktop application and its Python packages. |
+| **Git** | Yes | Downloads the project and lets you update it. Git is included with Xcode Command Line Tools. |
+| **Google AI Studio account and Gemini API key** | Yes | Authenticates Gemini answer generation and resume embeddings. |
+| **Visual Studio Code** | Optional | A convenient editor for viewing the project and editing `.env`. You can use TextEdit or Terminal instead. |
+
+### Not required for this version
+
+- **Full Xcode app:** not required; Xcode Command Line Tools are enough.
+- **FFmpeg:** not required by the current recording or transcription code.
+- **Docker:** not used.
+- **Node.js / npm:** not used.
+- **Ollama:** not used by the Gemini application flow. The old Ollama client file is retained in the repository, but this branch uses Gemini.
+
+---
+
+## 4. Install Xcode Command Line Tools
+
+The app uses Apple's ScreenCaptureKit API to capture Mac system audio. A small Swift helper is compiled automatically the first time you start recording. You do not need to compile it yourself.
+
+In Terminal, run:
+
+```bash
 xcode-select --install
 ```
 
-Create a Gemini API key at https://aistudio.google.com/apikey. Then create your local environment file (never commit it):
+A macOS dialog should appear. Click **Install** and accept the licence. Wait for installation to finish.
+
+Verify the tools:
+
+```bash
+xcode-select -p
+git --version
+swift --version
+```
+
+You should see an installed developer tools path and version information. If macOS says the command-line tools are already installed, continue.
+
+Apple's guide: [Install Xcode Command Line Tools](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools).
+
+---
+
+## 5. Install Homebrew
+
+Homebrew is used to install the recommended Python version.
+
+In Terminal, copy and run the official installer:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Follow the prompts. The installer may ask for your Mac login password. When you type a password in Terminal, the characters do not appear; this is normal.
+
+For Apple Silicon Macs, add Homebrew to your Terminal path:
+
+```bash
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+eval "$(/opt/homebrew/bin/brew shellenv)"
+```
+
+Check that Homebrew works:
+
+```bash
+brew --version
+```
+
+If Terminal says `brew: command not found`, close Terminal, open it again and run `brew --version`. If it still fails, check the Homebrew installation instructions: [brew.sh](https://brew.sh/).
+
+---
+
+## 6. Install Python 3.12
+
+Use Homebrew to install Python 3.12:
+
+```bash
+brew install python@3.12
+```
+
+Verify the installed version:
+
+```bash
+"$(brew --prefix python@3.12)/bin/python3.12" --version
+```
+
+The output should begin with `Python 3.12`.
+
+**Use Python 3.12 for this project.** MLX Whisper and other native dependencies need compatible Apple Silicon wheels. Do not use the macOS system Python, and do not use a very new Python version just because it is already installed.
+
+---
+
+## 7. Download the AI Meeting Assistant project
+
+Choose a folder where you want to keep the project. For example, your Desktop:
+
+```bash
+cd ~/Desktop
+```
+
+Clone the Gemini version of the repository:
+
+```bash
+git clone --branch experiment/gemini-api-cloud --single-branch https://github.com/danishshirsangi/ai-assistant.git
+```
+
+Enter the project folder:
+
+```bash
+cd ai-assistant
+```
+
+Check that you are on the correct branch:
+
+```bash
+git branch --show-current
+```
+
+It should print:
+
+```text
+experiment/gemini-api-cloud
+```
+
+> **Important:** The Gemini implementation is on the `experiment/gemini-api-cloud` branch. Do not clone the repository's default `main` branch if you want to run this version.
+
+---
+
+## 8. Create a Python virtual environment
+
+A virtual environment keeps this project's Python packages separate from other projects on your Mac.
+
+From inside the `ai-assistant` folder, run:
+
+```bash
+"$(brew --prefix python@3.12)/bin/python3.12" -m venv .venv
+```
+
+Activate it:
+
+```bash
+source .venv/bin/activate
+```
+
+Your Terminal prompt will usually show `.venv` when it is active.
+
+Verify:
+
+```bash
+python --version
+which python
+```
+
+The Python version should be 3.12, and the Python path should point inside the project's `.venv` directory.
+
+**Whenever you open a new Terminal window to work on this project, activate the environment again:**
+
+```bash
+cd ~/Desktop/ai-assistant
+source .venv/bin/activate
+```
+
+If you cloned the project somewhere else, use that folder's path instead.
+
+---
+
+## 9. Install the Python packages
+
+First update the Python package installer:
+
+```bash
+python -m pip install --upgrade pip wheel setuptools
+```
+
+Install the main application dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Install the macOS audio and local transcription dependencies:
+
+```bash
+python -m pip install -r requirements-audio-macos.txt
+```
+
+### What these packages are for
+
+| Package | Purpose |
+|---|---|
+| `PySide6` | Desktop application UI |
+| `google-genai` | Gemini API connection |
+| `python-dotenv` | Reads the Gemini key from the local `.env` file |
+| `PyMuPDF` | Reads text from PDF resumes |
+| `python-docx` | Reads DOCX resumes |
+| `sounddevice` | Records your microphone |
+| `soundfile` | Writes temporary microphone audio files |
+| `numpy` | Handles microphone audio data |
+| `pynput` | Listens for the global keyboard shortcuts |
+| `mlx-whisper` | Runs Whisper transcription locally on Apple Silicon |
+| `pyobjc-framework-Cocoa` | macOS window integration |
+
+The installer may take some time because MLX and other packages contain native components. Let it finish. If the command ends with an error, keep the complete Terminal output for troubleshooting.
+
+---
+
+## 10. Create your Gemini API key
+
+The app needs a Gemini API key to generate answers and create resume embeddings.
+
+1. Open [Google AI Studio – API Keys](https://aistudio.google.com/api-keys).
+2. Sign in with your Google account.
+3. Select an existing project or create a new project when prompted.
+4. Click **Create API key**.
+5. Copy the key and keep it private.
+
+Google's current key guidance: [Using Gemini API keys](https://ai.google.dev/gemini-api/docs/api-key).
+
+### Free tier and billing
+
+For a new project, check its tier in Google AI Studio before using it. This application is configured for the standard Gemini Developer API models listed below. Google lists free-tier access for both the configured chat model and embedding model, subject to model availability and project quotas.
+
+- **Do not click “Set up billing”** if you intend to stay on the Free Tier.
+- Check your actual project tier, active quotas and usage in [Google AI Studio](https://aistudio.google.com/).
+- Quotas are project- and model-specific and can change. The app cannot guarantee a particular number of free requests.
+- If you link a paid billing account or use a paid tier, applicable charges may apply.
+
+Google's live documentation: [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing) and [rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
+
+> **Privacy warning:** Google's current Gemini API pricing page says content submitted on the Free Tier may be used to improve Google products. Your resume text, interview transcript, questions, conversation context and retrieved resume excerpts are sent to Gemini. Do not use confidential employer/client information, private meeting content or sensitive personal data unless you have reviewed Google's terms and have permission to share it. Paid-tier data-use terms are different; check Google's current documentation rather than assuming.
+
+---
+
+## 11. Add the Gemini API key to the application
+
+Make sure your Terminal is inside the project folder (`ai-assistant`) and your virtual environment is active.
+
+Create your local environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and replace `your_google_ai_studio_api_key` with your key. The `.env` file is ignored by Git. This experiment sends resume text for embeddings and sends questions, transcript context, chat history and retrieved resume excerpts to Google Gemini. On the free tier, Google may use submitted content to improve its products. The API request is stateless; the free-tier data-use terms still apply. Do not use confidential work or unredacted personal data unless you have reviewed the terms and have permission to share it.
-
-## 2. Clone and install Python dependencies
+Open it in the Terminal text editor:
 
 ```bash
-git clone https://github.com/danishshirsangi/ai-assistant.git
-cd ai-assistant
-git fetch origin
-git switch --track -c experiment/gemini-api-cloud origin/experiment/gemini-api-cloud
+nano .env
 ```
 
-Create and activate a Python 3.12 virtual environment:
+The file contains these settings:
+
+```dotenv
+GEMINI_API_KEY=your_google_ai_studio_api_key
+GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2
+```
+
+Replace only the first value with the API key you copied from Google AI Studio. Keep the model names as shown unless you intentionally want to configure another model supported by your API project.
+
+Example format (this is a placeholder, not a working key):
+
+```dotenv
+GEMINI_API_KEY=PASTE_YOUR_KEY_HERE
+GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2
+```
+
+Save the file in `nano`:
+
+1. Press **Control + O**.
+2. Press **Enter** to confirm the file name.
+3. Press **Control + X** to exit.
+
+Restrict access to the key file:
 
 ```bash
-/opt/homebrew/bin/python3.12 -m venv .venv
-source .venv/bin/activate
-python --version
+chmod 600 .env
 ```
 
-Install the core app and optional macOS audio dependencies:
+The `.env` file is excluded by `.gitignore`. **Never commit it, upload it to GitHub, paste it into an issue, or share a screenshot that shows the key.** If you accidentally expose the key, revoke it in Google AI Studio and create a new one.
 
-```bash
-python -m pip install --upgrade pip wheel
-python -m pip install -r requirements.txt
-python -m pip install -r requirements-audio-macos.txt
-```
+---
 
-The audio requirements include:
+## 12. Test your Gemini connection
 
-| Package | Purpose |
-|---|---|
-| `sounddevice` | Microphone input capture through PortAudio |
-| `soundfile` | Write microphone PCM audio to temporary WAV |
-| `numpy` | Buffer and combine microphone audio frames |
-| `pynput` | Global Control + Option + R keyboard shortcut |
-| `mlx-whisper` | Local Whisper transcription on Apple Silicon |
-| `pyobjc-framework-Cocoa` | macOS window capture privacy API |
-| `PySide6` | Desktop UI and Qt event loop |
-| `google-genai` | Gemini Developer API client |
-| `python-dotenv` | Load the API key from `.env` |
-| `PyMuPDF` | PDF text extraction |
-| `python-docx` | DOCX text extraction |
+Before opening the desktop application, test the API.
 
-The ScreenCaptureKit helper is written in Swift and compiled automatically with `swiftc` the first time audio capture starts. Xcode Command Line Tools provide the Swift compiler and Apple SDKs.
-
-## 3. FFmpeg: required or optional?
-
-**FFmpeg is not required by the current app runtime.** The app records microphone audio as WAV using SoundFile and system audio as M4A using Apple's ScreenCaptureKit/AVFoundation helper. MLX Whisper reads those files directly.
-
-FFmpeg is useful as an optional diagnostic/conversion tool when inspecting recordings or converting an audio file manually:
-
-```bash
-brew install ffmpeg
-ffmpeg -version
-```
-
-Example: convert an M4A recording to mono 16 kHz WAV for inspection/testing:
-
-```bash
-ffmpeg -i input.m4a -ac 1 -ar 16000 -c:a pcm_s16le output.wav
-```
-
-Do not add FFmpeg to the Python requirements; it is a separate command-line utility and is not invoked by the app's normal recording/transcription path.
-
-## 4. Run the app
-
-From the project root, with the virtual environment active, first run the standalone API diagnostic:
+Make sure the virtual environment is active, then run:
 
 ```bash
 python diagnostics/gemini_smoke_test.py
 ```
 
-It separately checks the API key/model, embedding API and text-generation stream without launching PySide or loading a resume. If any step fails, share the terminal output from that step.
+The diagnostic checks:
 
-Then launch the desktop app:
+1. Whether the API key is loaded.
+2. Whether the configured chat model can be reached.
+3. Whether Gemini Embedding 2 can create a test embedding.
+4. Whether Gemini can stream a short text response.
+
+A successful run ends with:
+
+```text
+PASS: API check, embeddings and text generation all succeeded.
+```
+
+If this test fails, do not continue to audio troubleshooting yet. First check the API key, project tier, internet connection and the error shown in Terminal.
+
+---
+
+## 13. Launch the application
+
+From the project root, with `.venv` active, run:
 
 ```bash
 python main.py
 ```
 
-On first transcription, MLX Whisper downloads the configured model from Hugging Face. Transcription remains local afterwards. Gemini inference and resume embeddings require internet access and a Gemini API key.
+The **AI Meeting Assistant** window should open.
 
-## 5. Main window and question history
+The app runs as a macOS accessory application. It may not appear in the Dock or in the normal Command-Tab app switcher. Keep the Terminal session open while using the app. To quit, close the app or press **Control + C** in the Terminal that launched it.
 
-AI Meeting Assistant uses one application window; it does not create a separate floating answer overlay.
+### First-time resume upload
 
-The main window uses a solid black/forest-green base with glass-inspired dark panels, fine green borders and rounded controls. The native window remains opaque for reliable rendering; it does not currently use a blurred/translucent desktop material. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
+1. Click **Upload resume**.
+2. Select a resume in one of these formats: PDF, DOCX, TXT or MD.
+3. Wait for the **Resume indexed with Gemini** status and the confirmation message.
+4. Start asking questions.
 
-The left **Questions** sidebar stores selectable question entries. Each typed question gets its own entry; selecting one displays its corresponding answer in the main pane. The newest question is selected by default, and its answer streams into the pane while Gemini generates it. Markdown rendering supports headings, **bold**, *italic*, underline, ==highlights==, ~~strikethrough~~, numbered/bulleted lists, tables, blockquotes, links, inline/fenced code, and common LaTeX math.
-
-**Current audio behaviour:** each time you stop a recording, the app creates one sidebar entry using the latest detected interviewer question as its label, then generates one answer from that recording's transcript. A single uninterrupted hour-long recording therefore creates one entry, not a separate entry for every question in the call. Automatic live segmentation into individual questions is not implemented yet.
-
-Press **Control + Option + H** to hide AI Meeting Assistant while you work in other applications. Press the same shortcut again to restore it. Hiding the window does not quit the app or stop recording, transcription or answer generation. The in-app **Hide window** button provides the same action.
-
-## 6. Audio recording controls
-
-### Control + Option + R toggle shortcut
-
-- Press **Control + Option + R** once: begin microphone + system-audio recording.
-- Press **Control + Option + R** again: stop recording and begin local transcription.
-- You do not need to hold the key.
-- The app shows a recording state and changes the button to **Stop recording** while active.
-- If the global shortcut is unavailable, click the in-app Start/Stop button.
-
-The global shortcuts use `pynput`. macOS may require Accessibility and Input Monitoring permissions for the terminal or Python process that launches the app.
-
-### Hide and restore the main window
-
-- Press **Control + Option + H** to hide AI Meeting Assistant.
-- Press **Control + Option + H** again to show it, bring it forward and restore the always-on-top window.
-- Hiding the window does not close the app or stop audio capture, transcription or generation.
-- The **Hide window** button is an in-app alternative. When the app is hidden, use the global shortcut to restore it.
-
-### Microphone selection
-
-Use the Microphone dropdown to select the Mac's built-in microphone, a Bluetooth headset microphone, or another available input device. Use Refresh after connecting/disconnecting a device. The input selector is locked while recording.
-
-### Audio processing flow
-
-1. Control + Option + R starts a new recording session.
-2. `sounddevice` captures microphone frames.
-3. The Swift ScreenCaptureKit helper captures system audio.
-4. When Control + Option + R is pressed again, capture stops and both audio tracks are finalized.
-5. `mlx-whisper` transcribes the microphone and system-audio files locally.
-6. Transcript text, the current question, conversation history and retrieved resume excerpts are sent to Gemini for answer generation.
-7. The temporary session directory is deleted after transcription, including when transcription raises an error.
-
-Audio files are written briefly to a uniquely named directory under the operating system's temporary folder. They are **not retained in the project directory**. A later app launch also attempts to remove abandoned session folders left by a crashed process. The transcript may remain visible in the app conversation; this cleanup concerns the intermediate audio files.
-
-## 7. macOS permissions
-
-Grant permissions to the app that launches Python (for example, Terminal or VS Code):
-
-1. **Microphone:** allows capture of your microphone.
-2. **Screen & System Audio Recording:** allows ScreenCaptureKit to capture Mac system audio.
-3. **Accessibility / Input Monitoring:** may be required for the global Control + Option + R recording shortcut and Control + Option + H window-visibility shortcut.
-4. Restart the app after changing permissions.
-
-Menu names can vary slightly by macOS version. If system audio does not start, verify Screen & System Audio Recording permission and restart the launching application.
-
-## 8. Capture privacy setting
-
-The main window's **Capture privacy** toggle applies a macOS window-sharing setting to the single AI Meeting Assistant window.
-
-- ON requests exclusion from compatible macOS capture APIs.
-- OFF restores the normal sharing setting.
-- The setting is reapplied when windows are shown.
-
-This is not a universal invisibility or anti-capture feature. Apple's current documentation describes `NSWindowSharingNone` as a legacy value and says not to use it to hide content from capture. Some screen-sharing applications, remote desktop tools, screenshots, recording methods or OS versions may capture the window regardless. Always assume a visible app could be shared and follow workplace rules.
-
-## 9. Project layout
+The app extracts text, divides it into smaller sections, sends those sections to Gemini Embedding 2 and stores the indexed text and vectors in:
 
 ```text
-.
-├── audio/
-│   ├── controller.py              # Microphone/system capture lifecycle and Control + Option + R toggle
-│   ├── macos_system_audio.swift   # ScreenCaptureKit + AVFoundation recorder
-│   ├── transcriber.py             # Local MLX Whisper wrapper
-│   └── README.md                  # Audio subsystem notes
-├── core/
-│   ├── answer_generator.py        # Answer orchestration
-│   ├── context_refiner.py         # Transcript refinement
-│   ├── document_loader.py         # PDF/DOCX/TXT/MD extraction
-│   ├── gemini_client.py           # Gemini cloud chat + embeddings client
-   ├── ollama_client.py           # Retained old client; unused in this experiment
-│   ├── prompts.py                 # Prompt templates
-│   └── resume_rag.py              # Gemini embeddings + SQLite retrieval
-├── ui/
-│   ├── macos_window_privacy.py    # macOS window capture setting
-│   ├── main_window.py             # Main PySide6 UI
-│   └── worker.py                  # Background task worker
-├── assets/
-│   └── interview-copilot.svg      # App icon
-├── requirements.txt               # Core Python dependencies
-├── requirements-audio-macos.txt   # Optional macOS audio dependencies
-└── main.py                        # Application entry point
+ai-assistant/
+└── vector_db_gemini/
+    └── resume_vectors.sqlite3
 ```
 
-## 10. Troubleshooting
+You only need to upload the same resume again when you want to replace it, or if you have deleted/moved the local index. Restarting the app does not normally require another upload.
 
-### Python crashes with segmentation fault
+The original resume file is not stored in that folder; the database contains searchable text sections, filenames and embeddings. Resume text is sent to Google's API when the embeddings are created.
 
-Native extensions can crash the interpreter without a Python traceback. Confirm the active interpreter and architecture:
+---
+
+## 14. macOS permissions for recording and shortcuts
+
+Typed questions can be used without enabling microphone or system-audio capture. To use recording, macOS must give the application that launched Python the required permissions.
+
+Open:
+
+**Apple menu → System Settings → Privacy & Security**
+
+Depending on your macOS version, enable the following permissions for **Terminal**, **VS Code** or the application you use to launch `python main.py`.
+
+| macOS permission | Why the app needs it |
+|---|---|
+| **Microphone** | Captures your voice. |
+| **Screen & System Audio Recording** (wording may vary) | Allows Apple's ScreenCaptureKit to capture audio playing through your Mac. |
+| **Accessibility** | May be needed for global keyboard monitoring. |
+| **Input Monitoring** | May be needed for the global keyboard shortcuts. |
+
+After changing permissions:
+
+1. Quit the app.
+2. Quit and reopen Terminal (or your IDE).
+3. Run `python main.py` again.
+4. If macOS asks for permission, approve it.
+
+If the global shortcuts do not work, use the on-screen recording and hide buttons while you troubleshoot the permissions.
+
+---
+
+## 15. How to use the application
+
+### Ask a typed question
+
+1. Type a question in the input field at the bottom.
+2. Press **Enter** or click **Generate answer**.
+3. Gemini searches the saved resume index and generates an answer.
+4. The newest question appears in the left **Questions** sidebar.
+5. Click an older question to display its saved answer again.
+
+### Record a meeting or interview
+
+- Press **Control + Option + R** once to start recording.
+- Press **Control + Option + R** again to stop recording.
+- You can also use the on-screen **Start recording / Stop recording** button.
+- Choose the microphone from the dropdown if you do not want to use the macOS default microphone.
+- After stopping, the app transcribes the microphone and system audio locally and sends the transcript to Gemini to generate an answer.
+
+### Hide and restore the window
+
+- Press **Control + Option + H** to hide the whole app window.
+- Press **Control + Option + H** again to restore it.
+- You can also use the **Hide window** button when the app is visible.
+
+Hiding the window does not stop a recording or quit the app.
+
+### Clear the current session
+
+Click **Clear session** to clear the visible question list, answers and in-memory conversation context. This does **not** delete your saved resume index or your Gemini API key.
+
+---
+
+## 16. First-time audio setup and Whisper model download
+
+On the first recording, the app compiles its Swift ScreenCaptureKit helper automatically. Xcode Command Line Tools must be installed for this to work.
+
+On the first transcription, MLX Whisper downloads the configured model:
+
+```text
+mlx-community/whisper-base-mlx
+```
+
+The download is managed by the Hugging Face model cache. It requires an internet connection and happens only when the model is not already cached. Later transcriptions use the cached model locally.
+
+The transcription language is currently configured as **English**.
+
+The capture files are written temporarily in a macOS temporary directory. The app removes them after transcription. The recognized transcript is sent to Gemini for answer generation; the raw audio files are not sent to Gemini by this workflow.
+
+FFmpeg is not used by the current normal recording or transcription path.
+
+---
+
+## 17. Current limitations
+
+Please understand these limitations before using the app in a live interview:
+
+1. **Audio is processed after you stop recording.** The app does not yet continuously transcribe and answer each question during a recording.
+2. **One recording session creates one sidebar item.** A one-hour recording with many questions is currently treated as one transcript and one generated answer. It is not automatically split into one entry per interviewer question.
+3. **Typed questions are separate.** Each typed question creates its own sidebar item and can be revisited.
+4. **Whisper language is set to English.** Other languages may be transcribed inaccurately.
+5. **Gemini requires internet access.** Local transcription does not mean answer generation is fully offline.
+6. **AI can make mistakes.** Verify important technical answers, SQL, figures and claims rather than treating generated answers as guaranteed facts.
+7. **Always-on-top and capture privacy are best-effort.** macOS Spaces, full-screen applications and meeting software may behave differently. Do not assume the assistant is hidden from screen sharing or recording.
+
+Only record a meeting when participant consent, applicable law and your employer's policy allow it.
+
+---
+
+## 18. Troubleshooting
+
+### A. `brew: command not found`
+
+Close and reopen Terminal, then run:
 
 ```bash
-which python
-python --version
-python -c "import platform; print(platform.machine())"
+eval "$(/opt/homebrew/bin/brew shellenv)"
+brew --version
 ```
 
-Use a fresh Python 3.12 virtual environment and reinstall both requirements files. Do not mix packages from a system Python and a different virtual environment.
+If it still fails, revisit [Homebrew installation](https://brew.sh/).
 
-For a native crash trace:
+### B. `python: command not found` or the wrong Python version
+
+Make sure Python 3.12 is installed and the project's virtual environment is active:
+
+```bash
+"$(brew --prefix python@3.12)/bin/python3.12" --version
+source .venv/bin/activate
+python --version
+which python
+```
+
+If you created `.venv` using a different Python version, remove and recreate it:
+
+```bash
+deactivate
+rm -rf .venv
+"$(brew --prefix python@3.12)/bin/python3.12" -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip wheel setuptools
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-audio-macos.txt
+```
+
+### C. `ModuleNotFoundError` when launching the app
+
+Activate `.venv`, then reinstall the requirements:
+
+```bash
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-audio-macos.txt
+```
+
+### D. Gemini says the API key is missing
+
+- Make sure the file is named exactly `.env`, not `.env.txt`.
+- Make sure it is in the top-level `ai-assistant` folder, next to `main.py`.
+- Make sure the key line begins with `GEMINI_API_KEY=`.
+- Do not put spaces around the equals sign.
+- Restart the application after editing the file.
+- Run `python diagnostics/gemini_smoke_test.py` and read the first failing step.
+
+### E. Gemini returns 401, 403, 404 or 429 errors
+
+- **401 / 403:** check that the key is valid, has not been revoked and belongs to a project with Gemini API access.
+- **404 / model not found:** check the model name in `.env` and confirm that it is available for your API project.
+- **429 / quota exceeded:** check the active model/project limits in [AI Studio Rate Limits](https://aistudio.google.com/usage). Wait for the applicable limit to reset or review the project's tier. Do not assume every account has the same quota.
+
+### F. Audio recording does not start
+
+- Confirm macOS 13 or newer.
+- Confirm Xcode Command Line Tools are installed: `xcode-select -p`.
+- Confirm **Microphone** and **Screen & System Audio Recording** permissions.
+- Quit and reopen the launching app (Terminal or IDE).
+- Try the on-screen Start recording button if the keyboard shortcut does not work.
+
+### G. System audio is missing
+
+- Make sure audio is actually playing through the Mac while recording.
+- Check **Screen & System Audio Recording** permission.
+- Stop recording and check the error shown by the application.
+- Reopen Terminal after changing macOS permissions.
+
+### H. Control + Option + R or Control + Option + H does not work
+
+- Check Accessibility and Input Monitoring permissions for the app that launches Python.
+- Restart that launching app after changing permissions.
+- Use the in-app buttons as a fallback.
+- Check whether another macOS shortcut or application is using the same key combination.
+
+### I. First transcription takes a long time
+
+The first transcription may download the Whisper model. Keep the Mac connected to the internet and wait for the download to finish. Subsequent runs should reuse the cached model.
+
+### J. The application window is blank or does not display correctly
+
+Update to the latest commit on `experiment/gemini-api-cloud`, activate `.venv` and relaunch. If it remains blank, run:
 
 ```bash
 python -X faulthandler main.py
 ```
 
-### Control + Option + H does not work
+Share the full Terminal output and a screenshot of the window when reporting the issue. Do not share your `.env` file or API key.
 
-- Grant Accessibility and Input Monitoring permissions to Terminal/VS Code/Python as applicable.
-- Restart the app after granting permissions.
-- Use the in-app Hide window button while the main window is visible.
+---
 
-### Control + Option + R does not work
+## 19. Project files and local data
 
-- Use the in-app recording button to confirm audio capture works independently.
-- Grant Accessibility and Input Monitoring permissions to Terminal/VS Code/Python as applicable.
-- Restart the app after granting permissions.
-- Check that another application or macOS shortcut is not intercepting Control + Option + R.
+| Path | Description |
+|---|---|
+| `.env` | Your private Gemini API key and model settings. Never commit it. |
+| `.env.example` | Safe template showing the required environment variables. |
+| `.venv/` | Project's isolated Python environment. |
+| `vector_db_gemini/resume_vectors.sqlite3` | Local resume text chunks and embedding vectors. |
+| `data/bin/system_audio_capture` | Swift audio helper compiled on first use. |
+| macOS temporary directory | Temporary microphone/system audio files, removed after transcription. |
 
-### No microphone audio
+These local files and folders are excluded from Git where appropriate. Back up `.env` securely if you need to preserve your API configuration, and back up `vector_db_gemini/` if you want to keep the resume index.
 
-- Confirm the selected input device in the dropdown.
-- Check macOS Microphone permission.
-- Click Refresh after connecting a Bluetooth headset.
-- Test with the Mac's built-in microphone.
+---
 
-### No system audio
+## 20. Update the application
 
-- Confirm macOS 13+.
-- Grant Screen & System Audio Recording permission.
-- Install Xcode Command Line Tools.
-- Restart the terminal/IDE and app after granting permission.
-
-### Whisper model download or transcription issue
-
-- Confirm Apple Silicon and a supported Python environment.
-- Check internet access for the first model download.
-- Subsequent transcription runs locally using the downloaded model.
-- Inspect the audio file with FFmpeg if needed; FFmpeg is optional.
-
-### Gemini API unavailable
-
-- Check that `.env` exists in the project root and contains a valid `GEMINI_API_KEY`.
-- Confirm `GEMINI_MODEL` is enabled for your Gemini API tier.
-- Check internet connectivity and the project's Gemini API rate limits.
-
-## 11. Local data and security
-
-- Resume text is sent to Gemini for embeddings; vectors are stored locally in SQLite under `vector_db_gemini/`. The previous Ollama `vector_db/` remains untouched.
-- Gemini receives the question, transcript context, chat history and retrieved resume excerpts for answer generation. MLX Whisper transcription remains local. On the Gemini free tier, Google may use submitted content to improve its products as part of the Gemini free-tier data-use terms.
-- Audio recordings are temporary files and are removed after transcription.
-- Do not commit resumes, transcripts, temporary audio, credentials or local databases.
-- `data/`, `vector_db/`, `vector_db_gemini/`, virtual environments and Python cache files are ignored by Git.
-
-## 12. Updating
+When a new version is pushed to the Gemini branch, open Terminal and run:
 
 ```bash
+cd ~/Desktop/ai-assistant
 git switch experiment/gemini-api-cloud
 git pull origin experiment/gemini-api-cloud
 source .venv/bin/activate
+```
+
+If the update changes Python dependencies, reinstall them:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-audio-macos.txt
+```
+
+Then launch:
+
+```bash
 python main.py
 ```
 
-If dependencies changed in a later update, reinstall the requirements files.
+If the project is stored somewhere other than your Desktop, change the `cd` path accordingly.
+
+---
+
+## 21. Quick start checklist
+
+Use this checklist after following the full guide:
+
+- [ ] Apple Silicon Mac with macOS 13 or newer.
+- [ ] Xcode Command Line Tools installed.
+- [ ] Homebrew installed and working.
+- [ ] Python 3.12 installed.
+- [ ] Repository cloned on `experiment/gemini-api-cloud`.
+- [ ] Virtual environment created and activated.
+- [ ] Both Python requirements files installed.
+- [ ] Gemini API key added to the root `.env` file.
+- [ ] Gemini diagnostic ends with `PASS`.
+- [ ] Application opens with `python main.py`.
+- [ ] Resume uploaded and indexed.
+- [ ] macOS microphone, system-audio and shortcut permissions granted.
+- [ ] A short test recording successfully transcribes and generates an answer.
+
+---
+
+## Official installation and API resources
+
+- [Homebrew installation](https://brew.sh/)
+- [Apple Xcode Command Line Tools](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools)
+- [Python 3.12 downloads](https://www.python.org/downloads/)
+- [Git for macOS](https://git-scm.com/install/mac)
+- [Google AI Studio API Keys](https://aistudio.google.com/api-keys)
+- [Gemini API key guide](https://ai.google.dev/gemini-api/docs/api-key)
+- [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing)
+- [Gemini API rate limits](https://ai.google.dev/gemini-api/docs/rate-limits)
+- [Google Gen AI Python SDK](https://googleapis.github.io/python-genai/)
 
 ## License
 
-No license has been added yet. Contact the repository owner before redistributing.
-
-
-### Qt worker lifecycle
-
-Background tasks use `QRunnable` with automatic deletion disabled. The main window retains each worker until its result/error and completion signals have been delivered, then releases it. This avoids deleting the runnable and its Python-owned signal object while queued GUI updates are still pending.
+No license has been added to this repository yet. Contact the repository owner before redistributing the application.

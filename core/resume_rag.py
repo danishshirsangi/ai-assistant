@@ -8,15 +8,15 @@ from core.document_loader import load_document, chunk_text
 
 class ResumeRAG:
     """
-    Lightweight local semantic retrieval:
-    - Ollama creates embeddings.
-    - SQLite stores text + vectors.
+    Cloud-backed semantic retrieval:
+    - Gemini creates embeddings.
+    - SQLite stores text + vectors locally.
     - Python computes cosine similarity.
     This avoids ChromaDB/ONNX Runtime dependencies.
     """
 
-    def __init__(self, ollama, persist_dir="vector_db"):
-        self.ollama = ollama
+    def __init__(self, embedding_client, persist_dir="vector_db_gemini"):
+        self.embedding_client = embedding_client
         self.persist_dir = Path(persist_dir)
         self.persist_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.persist_dir / "resume_vectors.sqlite3"
@@ -48,11 +48,13 @@ class ResumeRAG:
                 "we will need to add OCR."
             )
 
-        embeddings = self.ollama.embed(chunks)
-        if len(embeddings) != len(chunks):
-            raise RuntimeError("Ollama returned an unexpected number of embeddings.")
-
         filename = Path(path).name
+        embeddings = self.embedding_client.embed(
+            chunks, purpose="document", titles=[filename] * len(chunks)
+        )
+        if len(embeddings) != len(chunks):
+            raise RuntimeError("Gemini returned an unexpected number of embeddings.")
+
         with self._connect() as conn:
             conn.execute("DELETE FROM chunks WHERE source_type = ?", ("resume",))
             conn.executemany(
@@ -86,7 +88,7 @@ class ResumeRAG:
         if not rows:
             return []
 
-        query_embedding = self.ollama.embed([question])[0]
+        query_embedding = self.embedding_client.embed([question], purpose="query")[0]
         ranked = []
         for chunk, embedding_json in rows:
             vector = json.loads(embedding_json)

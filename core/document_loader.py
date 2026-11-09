@@ -1,12 +1,12 @@
 from pathlib import Path
-import fitz
+import pymupdf
 from docx import Document
 
 def load_document(path):
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix == ".pdf":
-        doc = fitz.open(path)
+        doc = pymupdf.open(path)
         return "\n".join(page.get_text("text") for page in doc)
     if suffix == ".docx":
         doc = Document(path)

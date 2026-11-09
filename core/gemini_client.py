@@ -118,7 +118,6 @@ class GeminiClient:
             "store": False,
             "generation_config": {
                 "thinking_level": "low",
-                "max_output_tokens": 2048,
             },
         }
 

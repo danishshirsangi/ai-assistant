@@ -7,7 +7,7 @@ A cloud-assisted macOS desktop copilot experiment for meeting and interview assi
 ## Features
 
 - Native desktop UI built with Python and PySide6.
-- Cloud answer generation and resume embeddings through the Gemini Developer API (Gemini 3.8 Flash + Gemini Embedding 2). Gemini is configured with LOW thinking effort to prioritize response latency for live interview use.
+- Cloud answer generation and resume embeddings through the Gemini Developer API (Gemini 3.5 Flash-Lite + Gemini Embedding 2). Gemini uses minimal thinking effort to prioritize response latency for live interview use.
 - Resume/document indexing with SQLite-backed retrieval.
 - Microphone capture with selectable input device.
 - macOS system-audio capture through Apple's ScreenCaptureKit.
@@ -53,7 +53,7 @@ Create a Gemini API key at https://aistudio.google.com/apikey. Then create your 
 cp .env.example .env
 ```
 
-Open `.env` and replace `your_google_ai_studio_api_key` with your key. The `.env` file is ignored by Git. This experiment sends resume text for embeddings and sends questions, transcript context, chat history and retrieved resume excerpts to Google Gemini. On the free tier, Google may use submitted content to improve its products; The API request is stateless; the free-tier data-use terms still apply. Do not use confidential work or unredacted personal data unless you have reviewed the terms and have permission to share it.
+Open `.env` and replace `your_google_ai_studio_api_key` with your key. The `.env` file is ignored by Git. This experiment sends resume text for embeddings and sends questions, transcript context, chat history and retrieved resume excerpts to Google Gemini. On the free tier, Google may use submitted content to improve its products. The API request is stateless; the free-tier data-use terms still apply. Do not use confidential work or unredacted personal data unless you have reviewed the terms and have permission to share it.
 
 ## 2. Clone and install Python dependencies
 
@@ -119,7 +119,15 @@ Do not add FFmpeg to the Python requirements; it is a separate command-line util
 
 ## 4. Run the app
 
-From the project root, with the virtual environment active:
+From the project root, with the virtual environment active, first run the standalone API diagnostic:
+
+```bash
+python diagnostics/gemini_smoke_test.py
+```
+
+It separately checks the API key/model, embedding API and text-generation stream without launching PySide or loading a resume. If any step fails, share the terminal output from that step.
+
+Then launch the desktop app:
 
 ```bash
 python main.py

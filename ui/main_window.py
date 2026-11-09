@@ -528,7 +528,7 @@ class MainWindow(QMainWindow):
             source = transcript.split(marker, 1)[1]
         sentences = [
             part.strip()
-            for part in re.split(r"(?<=[?.!])\\s+", source)
+            for part in re.split(r"(?<=[?.!])\s+", source)
             if part.strip()
         ]
         questions = [part for part in sentences if part.endswith("?")]
@@ -670,9 +670,9 @@ class MainWindow(QMainWindow):
             )
 
     def _audio_answer_done(self, question_id, question, result):
-        _transcript, answer = result
+        transcript, answer = result
         self.history.extend([
-            {"role": "user", "content": question},
+            {"role": "user", "content": "Live interview transcript:\\n" + transcript},
             {"role": "assistant", "content": answer},
         ])
         self._finish_answer_stream(question_id, answer)

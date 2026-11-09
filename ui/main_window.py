@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         """)
 
         self.pool = QThreadPool.globalInstance()
+        self._active_workers = set()
         self.gemini = GeminiClient()
         self.rag = ResumeRAG(self.gemini, persist_dir="vector_db_gemini")
         self.generator = AnswerGenerator(self.gemini, self.rag)
@@ -411,13 +412,23 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.audio_hint.setText("Microphone selection failed: " + str(exc))
 
+    def _start_worker(self, worker):
+        # QRunnable auto-deletion is disabled; keep the Python wrapper and its
+        # signal object alive until the worker has posted all result/error events.
+        self._active_workers.add(worker)
+        worker.signals.finished.connect(self._release_worker)
+        self.pool.start(worker)
+
+    def _release_worker(self, worker):
+        self._active_workers.discard(worker)
+
     def _check_server(self):
         worker = FunctionWorker(self.gemini.health)
         worker.signals.result.connect(self._gemini_ok)
         worker.signals.error.connect(
             lambda error: self._gemini_unavailable(error)
         )
-        self.pool.start(worker)
+        self._start_worker(worker)
 
     def _gemini_unavailable(self, error):
         message = str(error)
@@ -455,7 +466,7 @@ class MainWindow(QMainWindow):
         worker = FunctionWorker(self.rag.add_file, path)
         worker.signals.result.connect(lambda count: self._resume_done(path, count))
         worker.signals.error.connect(self._show_error)
-        self.pool.start(worker)
+        self._start_worker(worker)
 
     def _resume_done(self, path, count):
         self._set_status("Resume indexed with Gemini")
@@ -486,7 +497,7 @@ class MainWindow(QMainWindow):
         worker.signals.progress.connect(self._answer_progress)
         worker.signals.result.connect(lambda answer: self._answer_done(question, answer))
         worker.signals.error.connect(self._show_error)
-        self.pool.start(worker)
+        self._start_worker(worker)
 
     def _audio_transcript_ready(self, transcript):
         self.transcript.setPlainText(transcript)
@@ -505,7 +516,7 @@ class MainWindow(QMainWindow):
         worker.signals.progress.connect(self._audio_answer_progress)
         worker.signals.result.connect(self._audio_answer_done)
         worker.signals.error.connect(self._show_error)
-        self.pool.start(worker)
+        self._start_worker(worker)
 
     def _answer_stage(self, stage):
         self._set_status(stage)

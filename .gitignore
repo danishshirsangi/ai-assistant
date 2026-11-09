@@ -5,3 +5,4 @@ __pycache__/
 data/
 vector_db/
 .env
+vector_db_gemini/

@@ -11,7 +11,7 @@ def main():
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     app = QApplication(sys.argv)
-    app.setApplicationName("Interview Copilot")
+    app.setApplicationName("AI Meeting Assistant")
     # Run as a macOS accessory app: no Dock icon or normal Cmd-Tab entry.
     try:
         from AppKit import NSApp, NSApplicationActivationPolicyAccessory

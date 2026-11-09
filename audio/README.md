@@ -1,6 +1,6 @@
 # Audio subsystem
 
-The audio subsystem captures the user's microphone and Mac system audio, transcribes both tracks locally, and passes transcript text to the app's local answer-generation workflow.
+The audio subsystem captures the user's microphone and Mac system audio and transcribes both tracks locally. In this Gemini experiment, the resulting transcript is then sent to Gemini for answer generation.
 
 ## Controls
 
@@ -50,8 +50,9 @@ The app compiles the Swift helper automatically on the first recording. MLX Whis
 3. ScreenCaptureKit writes system audio to M4A.
 4. The second Control + Option + R press stops capture and finalizes both tracks.
 5. MLX Whisper transcribes each track locally.
-6. The temporary session directory is removed in a `finally` block, even if transcription fails.
-7. A new Control + Option + R press creates a separate fresh session.
+6. The transcript is passed to the Gemini-backed answer workflow; transcript text and recent conversation context leave the Mac for cloud inference.
+7. The temporary session directory is removed in a `finally` block, even if transcription fails.
+8. A new Control + Option + R press creates a separate fresh session.
 
 Audio is temporarily written under the operating system's temp directory; it is not retained in the repository's `data/` directory. Startup cleanup attempts to remove stale folders belonging to processes that are no longer running.
 
@@ -77,4 +78,4 @@ Restart the launching app after changing permissions. macOS permission labels va
 
 ## Privacy
 
-Only record with required participant consent and workplace authorization. Temporary-file cleanup is not secure erasure and should not be treated as a guarantee against forensic recovery.
+Only record with required participant consent and workplace authorization. Audio capture and Whisper transcription remain local, but the recognized transcript is sent to Gemini to generate answers. Resume text is also sent to Gemini for embeddings. Free-tier Gemini API content may be used by Google to improve its products; do not use confidential meetings or unredacted personal resumes without reviewing the applicable terms. Setting `store=false` disables Interactions API object storage, but does not make requests local or override free-tier data-use terms. Temporary-file cleanup is not secure erasure and should not be treated as a guarantee against forensic recovery.

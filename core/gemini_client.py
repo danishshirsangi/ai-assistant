@@ -1,9 +1,14 @@
+import logging
 import os
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
@@ -26,7 +31,13 @@ class GeminiClient:
             or os.getenv("GEMINI_EMBEDDING_MODEL")
             or self.DEFAULT_EMBEDDING_MODEL
         )
-        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
+        self.client = (
+            genai.Client(
+                api_key=self.api_key,
+                http_options=types.HttpOptions(timeout=180_000),
+            )
+            if self.api_key else None
+        )
 
     def _require_client(self):
         if self.client is None:
@@ -59,16 +70,10 @@ class GeminiClient:
                 prepared.append(f"title: {title} | text: {text}")
 
         vectors = []
-        # Embedding 2 aggregates multiple inputs into one vector. Request each
-        # resume chunk separately so the SQLite index keeps one vector per chunk.
         for item in prepared:
-            content = types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=item)],
-            )
             result = client.models.embed_content(
                 model=self.embedding_model,
-                contents=content,
+                contents=item,
                 config=types.EmbedContentConfig(
                     output_dimensionality=self.EMBEDDING_DIMENSIONS
                 ),
@@ -102,40 +107,64 @@ class GeminiClient:
         return system_instruction, "\n\n".join(conversation)
 
     def chat(self, messages, temperature=0.35, on_chunk=None):
-        """Generate a stateless Gemini response and optionally stream text deltas."""
+        """Generate text with the supported Generate Content streaming interface."""
+        del temperature  # Gemini 3.x recommends leaving sampling parameters at defaults.
         client = self._require_client()
         system_instruction, prompt = self._format_input(messages)
         if not prompt:
             raise ValueError("No user prompt was provided to Gemini.")
 
-        # Keep the temperature argument for compatibility with AnswerGenerator,
-        # but leave Gemini 3.8 sampling parameters at their recommended defaults.
-        request = {
-            "model": self.chat_model,
-            "input": prompt,
-            "system_instruction": system_instruction or None,
-            # Disables Interactions object storage; free-tier data-use terms still apply.
-            "store": False,
-            "generation_config": {
-                "thinking_level": "low",
-            },
-        }
+        config = types.GenerateContentConfig(
+            system_instruction=system_instruction or None,
+            thinking_config=types.ThinkingConfig(thinking_level="low"),
+        )
+
+        started = time.monotonic()
+        first_text_at = None
+        parts = []
 
         if on_chunk is None:
-            interaction = client.interactions.create(**request)
-            return interaction.output_text or ""
+            response = client.models.generate_content(
+                model=self.chat_model,
+                contents=prompt,
+                config=config,
+            )
+            text = response.text or ""
+            logger.info(
+                "Gemini response completed in %.1fs",
+                time.monotonic() - started,
+            )
+            return text
 
-        parts = []
-        stream = client.interactions.create(**request, stream=True)
-        for event in stream:
-            if getattr(event, "event_type", None) != "step.delta":
+        # Google documents generate_content_stream as yielding response chunks
+        # whose .text property contains newly generated text.
+        stream = client.models.generate_content_stream(
+            model=self.chat_model,
+            contents=prompt,
+            config=config,
+        )
+        for chunk in stream:
+            token = chunk.text or ""
+            if not token:
                 continue
-            delta = getattr(event, "delta", None)
-            if getattr(delta, "type", None) != "text":
-                continue
-            token = getattr(delta, "text", "")
-            if token:
-                parts.append(token)
-                on_chunk(token)
+            if first_text_at is None:
+                first_text_at = time.monotonic()
+                logger.info(
+                    "Gemini first text token after %.1fs",
+                    first_text_at - started,
+                )
+            parts.append(token)
+            on_chunk(token)
 
+        elapsed = time.monotonic() - started
+        logger.info(
+            "Gemini stream completed in %.1fs with %s text chunks",
+            elapsed,
+            len(parts),
+        )
+        if not parts:
+            raise RuntimeError(
+                "Gemini completed the request without returning any text. "
+                "Check API quota, model availability and the terminal log."
+            )
         return "".join(parts)

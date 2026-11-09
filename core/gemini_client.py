@@ -117,7 +117,7 @@ class GeminiClient:
             # Disables Interactions object storage; free-tier data-use terms still apply.
             "store": False,
             "generation_config": {
-                "thinking_level": "medium",
+                "thinking_level": "low",
                 "max_output_tokens": 2048,
             },
         }

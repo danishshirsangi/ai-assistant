@@ -177,7 +177,7 @@ class MainWindow(QMainWindow):
         model_label = QLabel("MODEL")
         model_label.setObjectName("sectionHint")
         self.model = QComboBox()
-        self.model.addItems(["gemini-3.8-flash"])
+        self.model.addItems([GeminiClient.DEFAULT_CHAT_MODEL])
         self.model.setMinimumWidth(150)
 
         upload = QPushButton("Upload resume")
@@ -480,7 +480,9 @@ class MainWindow(QMainWindow):
             question,
             list(self.history),
             with_progress=True,
+            with_stage=True,
         )
+        worker.signals.stage.connect(self._answer_stage)
         worker.signals.progress.connect(self._answer_progress)
         worker.signals.result.connect(lambda answer: self._answer_done(question, answer))
         worker.signals.error.connect(self._show_error)
@@ -497,11 +499,16 @@ class MainWindow(QMainWindow):
             transcript,
             list(self.history),
             with_progress=True,
+            with_stage=True,
         )
+        worker.signals.stage.connect(self._answer_stage)
         worker.signals.progress.connect(self._audio_answer_progress)
         worker.signals.result.connect(self._audio_answer_done)
         worker.signals.error.connect(self._show_error)
         self.pool.start(worker)
+
+    def _answer_stage(self, stage):
+        self._set_status(stage)
 
     def _answer_progress(self, token):
         self._streamed_answer += token

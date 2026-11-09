@@ -413,7 +413,7 @@ class MainWindow(QMainWindow):
 
     def _check_server(self):
         worker = FunctionWorker(self.gemini.health)
-        worker.signals.result.connect(self._server_ok)
+        worker.signals.result.connect(self._gemini_ok)
         worker.signals.error.connect(
             lambda error: self._gemini_unavailable(error)
         )

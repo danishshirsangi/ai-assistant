@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 from core.answer_generator import AnswerGenerator
 from core.gemini_client import GeminiClient
 from core.resume_rag import ResumeRAG
-from ui.macos_window_privacy import apply_window_glass_effect, set_window_capture_exclusion
+from ui.macos_window_privacy import set_window_capture_exclusion
 from ui.rich_text import format_response_html
 from ui.worker import FunctionWorker
 
@@ -29,32 +29,28 @@ class MainWindow(QMainWindow):
         self.resize(1180, 850)
         self.setMinimumSize(900, 650)
 
-        # Glass-inspired black and green theme.
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # Keep the native window opaque so the full interface paints reliably.
         self.setStyleSheet("""
             QMainWindow {
-                background: transparent;
+                background-color: #050806;
                 color: #ecf7ef;
                 font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
             }
             QWidget {
                 color: #ecf7ef;
                 font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-                background: transparent;
             }
             QWidget#appRoot {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 rgba(5, 8, 6, 224), stop:0.52 rgba(9, 17, 12, 218), stop:1 rgba(11, 23, 16, 224));
-                border: 1px solid rgba(125, 255, 155, 38);
-                border-radius: 22px;
+                background-color: #080d09;
+                border: 1px solid #1e3b26;
+                border-radius: 18px;
             }
             QLabel { color: #ecf7ef; background: transparent; }
             QFrame#surfacePanel {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 rgba(21, 34, 25, 205), stop:1 rgba(10, 19, 13, 198));
-                border: 1px solid rgba(143, 255, 171, 52);
-                border-top: 1px solid rgba(190, 255, 205, 78);
-                border-radius: 17px;
+                background-color: #101a13;
+                border: 1px solid #25432d;
+                border-top: 1px solid #355d3e;
+                border-radius: 15px;
             }
             QLabel#appTitle { font-size: 25px; font-weight: 800; color: #f4fff6; }
             QLabel#appSubtitle { font-size: 11px; color: #8aa993; }
@@ -64,19 +60,19 @@ class MainWindow(QMainWindow):
             }
             QLabel#sectionHint { font-size: 10px; color: #789181; }
             QLabel#status {
-                color: #a9f5b8; background: rgba(37, 113, 58, 60);
+                color: #a9f5b8; background-color: #102a18;
                 border: 1px solid rgba(101, 239, 132, 90);
                 border-radius: 12px; padding: 7px 12px;
                 font-size: 11px; font-weight: 700;
             }
             QLineEdit, QComboBox {
-                background: rgba(10, 22, 14, 225); color: #effff2;
+                background-color: #0c160f; color: #effff2;
                 border: 1px solid rgba(119, 216, 140, 76);
                 border-radius: 11px; padding: 9px 12px;
                 selection-background-color: #267b3f; min-height: 19px;
             }
             QLineEdit:focus, QComboBox:focus {
-                border: 1px solid #69e985; background: rgba(15, 32, 19, 240);
+                border: 1px solid #69e985; background-color: #122319;
             }
             QComboBox::drop-down { border: none; width: 25px; }
             QComboBox QAbstractItemView {
@@ -85,7 +81,7 @@ class MainWindow(QMainWindow):
                 border: 1px solid #326d41; outline: none;
             }
             QListWidget {
-                background: rgba(7, 16, 10, 182); color: #cfe9d4;
+                background-color: #090f0b; color: #cfe9d4;
                 border: 1px solid rgba(112, 200, 132, 50);
                 border-radius: 12px; padding: 7px; outline: none; font-size: 12px;
             }
@@ -94,32 +90,32 @@ class MainWindow(QMainWindow):
                 border-radius: 9px; border: 1px solid transparent;
             }
             QListWidget::item:hover {
-                background: rgba(57, 120, 70, 65);
+                background-color: #15291a;
                 border: 1px solid rgba(115, 222, 139, 45);
             }
             QListWidget::item:selected {
-                background: rgba(52, 158, 78, 76); color: #f4fff6;
+                background-color: #1a3822; color: #f4fff6;
                 border: 1px solid rgba(126, 244, 150, 135);
             }
             QTextBrowser {
-                background: rgba(6, 14, 9, 178); color: #e9f5eb;
+                background-color: #090f0b; color: #e9f5eb;
                 border: 1px solid rgba(112, 200, 132, 56);
                 border-radius: 12px; padding: 14px;
                 selection-background-color: #267b3f; font-size: 13px;
             }
             QPushButton {
-                background: rgba(20, 37, 25, 220); color: #dff5e3;
+                background-color: #17271b; color: #dff5e3;
                 border: 1px solid rgba(123, 214, 143, 72);
                 border-radius: 11px; padding: 9px 14px;
                 font-size: 11px; font-weight: 700;
             }
             QPushButton:hover {
-                background: rgba(41, 83, 49, 238);
+                background-color: #24452c;
                 border-color: rgba(137, 245, 158, 145);
             }
-            QPushButton:pressed { background: rgba(25, 67, 35, 245); }
+            QPushButton:pressed { background-color: #1a3822; }
             QPushButton:disabled {
-                color: #617568; background: rgba(17, 26, 19, 170);
+                color: #617568; background-color: #121a14;
                 border-color: rgba(95, 126, 101, 40);
             }
             QPushButton#primaryButton {
@@ -133,16 +129,16 @@ class MainWindow(QMainWindow):
                     stop:0 #a1ffae, stop:1 #58dc78);
             }
             QPushButton#recordButton {
-                background: rgba(38, 105, 54, 90);
+                background-color: #15321d;
                 border-color: rgba(111, 236, 137, 145);
                 color: #c8ffd2; min-width: 112px;
             }
             QPushButton#recordButton[recording="true"] {
-                background: rgba(139, 40, 40, 210);
+                background-color: #682323;
                 border-color: #ff7979; color: #fff2f2;
             }
             QPushButton#hideButton {
-                background: rgba(9, 18, 12, 205);
+                background-color: #101912;
                 border-color: rgba(118, 198, 134, 60); color: #a9c9b0;
             }
             QSplitter::handle {
@@ -173,11 +169,6 @@ class MainWindow(QMainWindow):
         self._stream_render_timer.timeout.connect(self._render_streamed_answer)
 
         self._build_ui()
-        # Use native macOS vibrancy when available; Qt translucency is the fallback.
-        try:
-            apply_window_glass_effect(self)
-        except Exception:
-            pass
         self._setup_audio()
         self._check_server()
 

@@ -135,13 +135,15 @@ python main.py
 
 On first transcription, MLX Whisper downloads the configured model from Hugging Face. Transcription remains local afterwards. Gemini inference and resume embeddings require internet access and a Gemini API key.
 
-## 5. Main window and live answers
+## 5. Main window and question history
 
 AI Meeting Assistant uses one application window; it does not create a separate floating answer overlay. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
 
-Typed questions and questions extracted from interview transcripts stream token by token into the **Latest answer** pane while Gemini generates them. Markdown styling is refreshed during streaming and finalized when generation completes. The renderer supports headings, **bold**, *italic*, underline, ==highlights==, ~~strikethrough~~, numbered/bulleted lists, tables, blockquotes, links, inline/fenced code, and common LaTeX math. The full completed answer is also added to the conversation history.
+The left **Questions** sidebar stores selectable question entries. Each typed question gets its own entry; selecting one displays its corresponding answer in the main pane. The newest question is selected by default, and its answer streams into the pane while Gemini generates it. Markdown rendering supports headings, **bold**, *italic*, underline, ==highlights==, ~~strikethrough~~, numbered/bulleted lists, tables, blockquotes, links, inline/fenced code, and common LaTeX math.
 
-Press **Control + Option + H** to hide the entire main window while you work in other applications. Press the same shortcut again to restore it. Hiding the window does not quit the app or stop recording, transcription or answer generation. The in-app **Hide window** button provides the same action.
+**Current audio behaviour:** each time you stop a recording, the app creates one sidebar entry using the latest detected interviewer question as its label, then generates one answer from that recording's transcript. A single uninterrupted hour-long recording therefore creates one entry, not a separate entry for every question in the call. Automatic live segmentation into individual questions is not implemented yet.
+
+Press **Control + Option + H** to hide AI Meeting Assistant while you work in other applications. Press the same shortcut again to restore it. Hiding the window does not quit the app or stop recording, transcription or answer generation. The in-app **Hide window** button provides the same action.
 
 ## 6. Audio recording controls
 

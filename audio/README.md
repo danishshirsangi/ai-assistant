@@ -6,7 +6,7 @@ The audio subsystem captures the user's microphone and Mac system audio and tran
 
 - **Control + Option + R press:** start recording.
 - **Control + Option + R press again:** stop recording and begin transcription.
-- **Control + Option + H:** hide the Interview Copilot main window; press again to restore it.
+- **Control + Option + H:** hide the AI Meeting Assistant main window; press again to restore it.
 - Hiding the window does not stop recording, transcription or answer generation.
 - Holding either shortcut is not required.
 - The in-app Start/Stop and Hide window buttons are fallbacks.

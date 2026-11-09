@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
@@ -5,7 +6,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QPushButton, QSplitter, QTextBrowser,
-    QVBoxLayout, QWidget,
+    QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
 )
 
 from core.answer_generator import AnswerGenerator
@@ -19,7 +20,7 @@ from ui.worker import FunctionWorker
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Interview Copilot")
+        self.setWindowTitle("AI Meeting Assistant")
         self.setWindowIcon(
             QIcon(str(Path(__file__).resolve().parents[1] / "assets" / "interview-copilot.svg"))
         )
@@ -63,6 +64,26 @@ class MainWindow(QMainWindow):
                 min-height: 18px;
             }
             QLineEdit:focus, QComboBox:focus { border: 1px solid #83b2f1; }
+            QListWidget {
+                background: #101b2b;
+                color: #dce8f8;
+                border: 1px solid #263a54;
+                border-radius: 8px;
+                padding: 6px;
+                outline: none;
+                font-size: 12px;
+            }
+            QListWidget::item {
+                padding: 11px 10px;
+                margin: 2px 0;
+                border-radius: 7px;
+            }
+            QListWidget::item:hover { background: #1a2a40; }
+            QListWidget::item:selected {
+                background: #263d5d;
+                color: #ffffff;
+                border-left: 3px solid #69a8f2;
+            }
             QTextBrowser {
                 background: #101b2b;
                 color: #eaf1fc;
@@ -114,6 +135,10 @@ class MainWindow(QMainWindow):
         self.rag = ResumeRAG(self.gemini, persist_dir="vector_db_gemini")
         self.generator = AnswerGenerator(self.gemini, self.rag)
         self.history = []
+        self.question_items = {}
+        self._next_question_id = 1
+        self._active_question_id = None
+        self._selected_question_id = None
         self._streamed_answer = ""
         self._capture_privacy_enabled = True
         self.audio = None
@@ -159,9 +184,9 @@ class MainWindow(QMainWindow):
         header = QHBoxLayout()
         title_group = QVBoxLayout()
         title_group.setSpacing(2)
-        title = QLabel("Interview Copilot")
+        title = QLabel("AI Meeting Assistant")
         title.setObjectName("appTitle")
-        subtitle = QLabel("Gemini-powered interview assistant")
+        subtitle = QLabel("Your live meeting and interview copilot")
         subtitle.setObjectName("appSubtitle")
         title_group.addWidget(title)
         title_group.addWidget(subtitle)
@@ -184,7 +209,8 @@ class MainWindow(QMainWindow):
         upload = QPushButton("Upload resume")
         upload.clicked.connect(self.upload_resume)
         clear = QPushButton("Clear")
-        clear.setToolTip("Clear conversation, transcript and latest answer")
+        clear.setText("Clear session")
+        clear.setToolTip("Clear the question list, answers and session context")
         clear.clicked.connect(self.clear_chat)
 
         self.privacy_button = QPushButton("Capture privacy: ON")
@@ -197,7 +223,7 @@ class MainWindow(QMainWindow):
         self.hide_button = QPushButton("Hide window  ⌃⌥H")
         self.hide_button.setObjectName("hideButton")
         self.hide_button.setToolTip(
-            "Hide Interview Copilot so you can work in other apps. Press Control + Option + H to restore it."
+            "Hide AI Meeting Assistant. Press Control + Option + H to restore it."
         )
         self.hide_button.clicked.connect(self._toggle_window_visibility)
 
@@ -219,42 +245,33 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(10)
 
-        conversation_panel, conversation_layout = self._make_panel(
-            "CONVERSATION", "recent turns"
+        questions_panel, questions_layout = self._make_panel(
+            "QUESTIONS", "select one to revisit its answer"
         )
-        self.chat = QTextBrowser()
-        self.chat.setOpenExternalLinks(False)
-        self.chat.setPlaceholderText("Your questions and completed answers will appear here.")
-        self.chat.setStyleSheet("font-size: 12px;")
-        conversation_layout.addWidget(self.chat, 1)
-
-        transcript_panel, transcript_layout = self._make_panel(
-            "LIVE TRANSCRIPT", "local transcription"
-        )
-        self.transcript = QTextBrowser()
-        self.transcript.setOpenExternalLinks(False)
-        self.transcript.setPlaceholderText(
-            "After recording stops, the microphone and meeting transcript will appear here."
-        )
-        self.transcript.setStyleSheet("font-size: 11px; color: #b8c8df;")
-        transcript_layout.addWidget(self.transcript, 1)
-
-        left_layout.addWidget(conversation_panel, 3)
-        left_layout.addWidget(transcript_panel, 2)
+        self.questions_empty = QLabel("Questions will appear here as you ask them.")
+        self.questions_empty.setObjectName("sectionHint")
+        self.questions_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.question_list = QListWidget()
+        self.question_list.setSpacing(2)
+        self.question_list.currentItemChanged.connect(self._show_selected_question)
+        questions_layout.addWidget(self.questions_empty)
+        questions_layout.addWidget(self.question_list, 1)
+        left_layout.addWidget(questions_panel, 1)
 
         answer_panel, answer_layout = self._make_panel(
-            "LATEST ANSWER", "live response"
+            "ANSWER", "latest response"
         )
-        answer_header_hint = QLabel(
-            "Formatted response · updates as the model generates"
+        self.answer_header_hint = QLabel(
+            "Your latest answer will appear here. Select a question to revisit its answer."
         )
-        answer_header_hint.setObjectName("sectionHint")
-        answer_layout.addWidget(answer_header_hint)
+        self.answer_header_hint.setObjectName("sectionHint")
+        self.answer_header_hint.setWordWrap(True)
+        answer_layout.addWidget(self.answer_header_hint)
         self.answer_view = QTextBrowser()
         self.answer_view.setObjectName("answerView")
         self.answer_view.setOpenExternalLinks(False)
         self.answer_view.setPlaceholderText(
-            "Your answer will appear here with headings, bold text, highlights, code and lists."
+            "Your latest answer will appear here with headings, code and formatted content."
         )
         self.answer_view.setStyleSheet(
             "QTextBrowser { font-size: 14px; padding: 14px; line-height: 1.5; }"
@@ -263,7 +280,7 @@ class MainWindow(QMainWindow):
 
         workspace.addWidget(left_column)
         workspace.addWidget(answer_panel)
-        workspace.setSizes([390, 760])
+        workspace.setSizes([320, 830])
         root.addWidget(workspace, 1)
 
         # Recording controls
@@ -470,7 +487,6 @@ class MainWindow(QMainWindow):
 
     def _resume_done(self, path, count):
         self._set_status("Resume indexed with Gemini")
-        self._append("Resume", f"Loaded **{Path(path).name}** · indexed {count} searchable sections.")
         QMessageBox.information(
             self, "Resume ready",
             f"Resume indexed successfully.\n{count} sections added to local search."
@@ -482,10 +498,11 @@ class MainWindow(QMainWindow):
             return
         self.gemini.chat_model = self.model.currentText() or GeminiClient.DEFAULT_CHAT_MODEL
         self.question.clear()
-        self._append("You", question)
+        question_id = self._add_question(question)
+        self._active_question_id = question_id
         self.ask_button.setEnabled(False)
         self._set_status("Preparing Gemini response…")
-        self._begin_answer_stream()
+        self._begin_answer_stream(question_id)
         worker = FunctionWorker(
             self.generator.answer,
             question,
@@ -495,16 +512,39 @@ class MainWindow(QMainWindow):
         )
         worker.signals.stage.connect(self._answer_stage)
         worker.signals.progress.connect(self._answer_progress)
-        worker.signals.result.connect(lambda answer: self._answer_done(question, answer))
-        worker.signals.error.connect(self._show_error)
+        worker.signals.result.connect(
+            lambda answer, qid=question_id: self._answer_done(qid, question, answer)
+        )
+        worker.signals.error.connect(
+            lambda error, qid=question_id: self._question_error(qid, error)
+        )
         self._start_worker(worker)
 
+    @staticmethod
+    def _question_label_from_transcript(transcript):
+        source = transcript
+        marker = "[OTHER PARTICIPANTS / SYSTEM AUDIO]"
+        if marker in transcript:
+            source = transcript.split(marker, 1)[1]
+        sentences = [
+            part.strip()
+            for part in re.split(r"(?<=[?.!])\\s+", source)
+            if part.strip()
+        ]
+        questions = [part for part in sentences if part.endswith("?")]
+        label = questions[-1] if questions else (sentences[-1] if sentences else source.strip())
+        label = " ".join(label.split())
+        if not label:
+            label = "Interview recording"
+        return label[:117].rstrip() + ("…" if len(label) > 120 else "")
+
     def _audio_transcript_ready(self, transcript):
-        self.transcript.setPlainText(transcript)
-        self._append("Live transcript", transcript)
+        question = self._question_label_from_transcript(transcript)
+        question_id = self._add_question(question)
+        self._active_question_id = question_id
         self.ask_button.setEnabled(False)
         self._set_status("Finding relevant context…")
-        self._begin_answer_stream()
+        self._begin_answer_stream(question_id)
         worker = FunctionWorker(
             self.generator.answer_from_transcript,
             transcript,
@@ -514,9 +554,71 @@ class MainWindow(QMainWindow):
         )
         worker.signals.stage.connect(self._answer_stage)
         worker.signals.progress.connect(self._audio_answer_progress)
-        worker.signals.result.connect(self._audio_answer_done)
-        worker.signals.error.connect(self._show_error)
+        worker.signals.result.connect(
+            lambda result, qid=question_id, label=question:
+                self._audio_answer_done(qid, label, result)
+        )
+        worker.signals.error.connect(
+            lambda error, qid=question_id: self._question_error(qid, error)
+        )
         self._start_worker(worker)
+
+    def _add_question(self, question):
+        question = " ".join(str(question).split())
+        question_id = self._next_question_id
+        self._next_question_id += 1
+        self.question_items[question_id] = {
+            "question": question,
+            "answer": "",
+            "status": "pending",
+        }
+        visible = question if len(question) <= 105 else question[:102].rstrip() + "…"
+        item = QListWidgetItem(f"Q{question_id:02d}  {visible}")
+        item.setData(Qt.ItemDataRole.UserRole, question_id)
+        item.setToolTip(question)
+        self.question_list.addItem(item)
+        self.questions_empty.hide()
+        self.question_list.setCurrentItem(item)
+        self.question_list.scrollToBottom()
+        return question_id
+
+    def _show_selected_question(self, current, _previous):
+        if current is None:
+            self._selected_question_id = None
+            return
+        question_id = current.data(Qt.ItemDataRole.UserRole)
+        entry = self.question_items.get(question_id)
+        if entry is None:
+            return
+        self._selected_question_id = question_id
+        question = entry["question"]
+        self.answer_header_hint.setText(question)
+        self.answer_header_hint.setToolTip(question)
+        if entry["status"] == "pending":
+            self.answer_view.setHtml(
+                "<p style='color:#9fb7d6;'>Generating answer…</p>"
+            )
+        elif entry["status"] == "error":
+            self.answer_view.setHtml(
+                "<p style='color:#ffb4a8;'>This answer could not be generated.</p>"
+            )
+        elif entry["answer"]:
+            self.answer_view.setHtml(format_response_html(entry["answer"]))
+        else:
+            self.answer_view.clear()
+
+    def _question_error(self, question_id, error):
+        entry = self.question_items.get(question_id)
+        if entry is not None:
+            entry["status"] = "error"
+        self._stream_render_timer.stop()
+        self.ask_button.setEnabled(True)
+        self._set_status("Error", warning=True)
+        if self._selected_question_id == question_id:
+            self.answer_view.setHtml(
+                "<p style='color:#ffb4a8;'>Answer generation failed. See the error dialog for details.</p>"
+            )
+        QMessageBox.critical(self, "AI Meeting Assistant error", str(error))
 
     def _answer_stage(self, stage):
         self._set_status(stage)
@@ -524,21 +626,28 @@ class MainWindow(QMainWindow):
     def _answer_progress(self, token):
         self._streamed_answer += token
         self._set_status("Generating answer…")
-        if not self._stream_render_timer.isActive():
-            self._stream_render_timer.start()
+        if self._selected_question_id == self._active_question_id:
+            if not self._stream_render_timer.isActive():
+                self._stream_render_timer.start()
 
     def _audio_answer_progress(self, token):
         self._answer_progress(token)
 
-    def _begin_answer_stream(self):
+    def _begin_answer_stream(self, question_id):
         self._stream_render_timer.stop()
         self._streamed_answer = ""
-        self.answer_view.setHtml(
-            "<p style='color:#9fb7d6;'>Generating answer…</p>"
-        )
+        if self._selected_question_id == question_id:
+            self.answer_header_hint.setText(
+                self.question_items[question_id]["question"]
+            )
+            self.answer_view.setHtml(
+                "<p style='color:#9fb7d6;'>Generating answer…</p>"
+            )
 
     def _render_streamed_answer(self):
         if not self._streamed_answer:
+            return
+        if self._selected_question_id != self._active_question_id:
             return
         scrollbar = self.answer_view.verticalScrollBar()
         keep_at_bottom = scrollbar.value() >= scrollbar.maximum() - 8
@@ -546,23 +655,27 @@ class MainWindow(QMainWindow):
         if keep_at_bottom:
             scrollbar.setValue(scrollbar.maximum())
 
-    def _finish_answer_stream(self, answer):
+    def _finish_answer_stream(self, question_id, answer):
         self._stream_render_timer.stop()
+        entry = self.question_items.get(question_id)
+        if entry is not None:
+            entry["answer"] = answer
+            entry["status"] = "complete"
         self._streamed_answer = answer
-        self.answer_view.setHtml(format_response_html(answer))
-        self.answer_view.verticalScrollBar().setValue(
-            self.answer_view.verticalScrollBar().maximum()
-        )
+        if self._selected_question_id == question_id:
+            self.answer_header_hint.setText(entry["question"] if entry else "Answer")
+            self.answer_view.setHtml(format_response_html(answer))
+            self.answer_view.verticalScrollBar().setValue(
+                self.answer_view.verticalScrollBar().maximum()
+            )
 
-    def _audio_answer_done(self, result):
-        transcript, answer = result
-        self.transcript.setPlainText(transcript)
-        self._append("Copilot", answer)
+    def _audio_answer_done(self, question_id, question, result):
+        _transcript, answer = result
         self.history.extend([
-            {"role": "user", "content": "Live interview transcript:\n" + transcript},
+            {"role": "user", "content": question},
             {"role": "assistant", "content": answer},
         ])
-        self._finish_answer_stream(answer)
+        self._finish_answer_stream(question_id, answer)
         self.ask_button.setEnabled(True)
         self._set_status("Ready")
 
@@ -587,36 +700,32 @@ class MainWindow(QMainWindow):
         self.audio_hint.setText(message)
         self.record_button.setText("Start recording")
 
-    def _answer_done(self, question, answer):
-        self._append("Copilot", answer)
+    def _answer_done(self, question_id, question, answer):
         self.history.extend([
             {"role": "user", "content": question},
             {"role": "assistant", "content": answer},
         ])
-        self._finish_answer_stream(answer)
+        self._finish_answer_stream(question_id, answer)
         self.ask_button.setEnabled(True)
         self._set_status("Ready")
-
-    def _append(self, speaker, text):
-        self.chat.append(
-            f"<p style='margin:9px 0 3px;color:#a9ccff;'><b>{speaker}</b></p>"
-            + format_response_html(text)
-        )
-        self.chat.verticalScrollBar().setValue(self.chat.verticalScrollBar().maximum())
 
     def _show_error(self, error):
         self._stream_render_timer.stop()
         self.ask_button.setEnabled(True)
         self._set_status("Error", warning=True)
-        self.answer_view.setHtml(
-            "<p style='color:#ffb4a8;'>Answer generation failed. See the error dialog for details.</p>"
-        )
-        QMessageBox.critical(self, "Interview Copilot error", error)
+        QMessageBox.critical(self, "AI Meeting Assistant error", str(error))
 
     def clear_chat(self):
-        self.chat.clear()
+        self.question_list.clear()
+        self.question_items.clear()
+        self._next_question_id = 1
+        self._active_question_id = None
+        self._selected_question_id = None
+        self.questions_empty.show()
         self.answer_view.clear()
-        self.transcript.clear()
+        self.answer_header_hint.setText(
+            "Your latest answer will appear here. Select a question to revisit its answer."
+        )
         self.history.clear()
         self._streamed_answer = ""
         self._stream_render_timer.stop()

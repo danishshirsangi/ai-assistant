@@ -34,7 +34,7 @@ class GeminiClient:
         self.client = (
             genai.Client(
                 api_key=self.api_key,
-                http_options=types.HttpOptions(timeout=180_000),
+                http_options=types.HttpOptions(timeout=90_000),
             )
             if self.api_key else None
         )
@@ -122,6 +122,11 @@ class GeminiClient:
         started = time.monotonic()
         first_text_at = None
         parts = []
+        logger.info(
+            "Starting Gemini request: model=%s, prompt_chars=%s, thinking=low",
+            self.chat_model,
+            len(prompt),
+        )
 
         if on_chunk is None:
             response = client.models.generate_content(

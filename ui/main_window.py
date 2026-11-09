@@ -334,7 +334,7 @@ class MainWindow(QMainWindow):
         root.addLayout(composer)
 
         footer = QLabel(
-            "⌃⌥R  Record / stop     ·     ⌃⌥H  Hide / restore window     ·     Local AI processing"
+            "⌃⌥R  Record / stop     ·     ⌃⌥H  Hide / restore window     ·     Local transcription · Gemini responses online"
         )
         footer.setObjectName("sectionHint")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)

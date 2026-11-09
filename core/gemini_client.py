@@ -114,7 +114,7 @@ class GeminiClient:
             "model": self.chat_model,
             "input": prompt,
             "system_instruction": system_instruction or None,
-            # Do not store Interaction objects for conversation-history management.
+            # Disables Interactions object storage; free-tier data-use terms still apply.
             "store": False,
             "generation_config": {
                 "thinking_level": "medium",

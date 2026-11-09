@@ -137,7 +137,9 @@ On first transcription, MLX Whisper downloads the configured model from Hugging 
 
 ## 5. Main window and question history
 
-AI Meeting Assistant uses one application window; it does not create a separate floating answer overlay. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
+AI Meeting Assistant uses one application window; it does not create a separate floating answer overlay.
+
+The main window uses a solid black/forest-green base with glass-inspired dark panels, fine green borders and rounded controls. The native window remains opaque for reliable rendering; it does not currently use a blurred/translucent desktop material. The main window requests always-on-top behavior through Qt. Window stacking can vary with macOS Spaces, full-screen apps and system-managed windows.
 
 The left **Questions** sidebar stores selectable question entries. Each typed question gets its own entry; selecting one displays its corresponding answer in the main pane. The newest question is selected by default, and its answer streams into the pane while Gemini generates it. Markdown rendering supports headings, **bold**, *italic*, underline, ==highlights==, ~~strikethrough~~, numbered/bulleted lists, tables, blockquotes, links, inline/fenced code, and common LaTeX math.
 

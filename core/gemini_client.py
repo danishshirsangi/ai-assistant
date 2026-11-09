@@ -7,7 +7,7 @@ from google.genai import types
 
 
 class GeminiClient:
-    """Gemini cloud chat and embedding client used by the cloud experiment."""
+    """Gemini cloud chat and embeddings client for the cloud experiment."""
 
     DEFAULT_CHAT_MODEL = "gemini-3.8-flash"
     DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
@@ -38,25 +38,25 @@ class GeminiClient:
         return self.client
 
     def health(self):
-        """Validate the API key and configured chat model without generating text."""
+        """Check API access and the configured model without generating a response."""
         client = self._require_client()
         client.models.get(model=self.chat_model)
         return {"models": [{"name": self.chat_model}]}
 
-    def embed(self, texts, purpose="document"):
+    def embed(self, texts, purpose="document", titles=None):
         """Create Gemini Embedding 2 vectors for resume retrieval."""
         if not texts:
             return []
 
         client = self._require_client()
-        if purpose == "query":
-            prepared = [
-                f"task: search query\nquery: {text}" for text in texts
-            ]
-        else:
-            prepared = [
-                f"task: search document\ncontent: {text}" for text in texts
-            ]
+        titles = titles or []
+        prepared = []
+        for index, text in enumerate(texts):
+            if purpose == "query":
+                prepared.append(f"task: search result | query: {text}")
+            else:
+                title = titles[index] if index < len(titles) else "none"
+                prepared.append(f"title: {title} | text: {text}")
 
         contents = [
             types.Content(
@@ -67,7 +67,6 @@ class GeminiClient:
         ]
 
         vectors = []
-        # Keep requests at a moderate size for predictable API latency.
         for start in range(0, len(contents), 32):
             batch = contents[start:start + 32]
             result = client.models.embed_content(
@@ -106,7 +105,7 @@ class GeminiClient:
         return system_instruction, "\n\n".join(conversation)
 
     def chat(self, messages, temperature=0.35, on_chunk=None):
-        """Generate an answer through the stateless Gemini Interactions API."""
+        """Generate a stateless Gemini response and optionally stream text deltas."""
         client = self._require_client()
         system_instruction, prompt = self._format_input(messages)
         if not prompt:
@@ -116,14 +115,9 @@ class GeminiClient:
             "model": self.chat_model,
             "input": prompt,
             "system_instruction": system_instruction or None,
-            # Keep conversation content client-side rather than storing Interaction
-            # records on Google's servers. This does not change free-tier data-use
-            # terms for requests sent to the API.
+            # Do not store Interaction objects for conversation-history management.
             "store": False,
-            "generation_config": {
-                "temperature": temperature,
-                "thinking_level": "medium",
-            },
+            "generation_config": {"thinking_level": "medium"},
         }
 
         if on_chunk is None:

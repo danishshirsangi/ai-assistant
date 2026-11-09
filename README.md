@@ -53,7 +53,7 @@ Create a Gemini API key at https://aistudio.google.com/apikey. Then create your 
 cp .env.example .env
 ```
 
-Open `.env` and replace `your_google_ai_studio_api_key` with your key. The `.env` file is ignored by Git. This experiment sends resume text for embeddings and sends questions, transcript context, chat history and retrieved resume excerpts to Google Gemini. Do not use confidential work or personal data unless you have reviewed Google's API data-use terms.
+Open `.env` and replace `your_google_ai_studio_api_key` with your key. The `.env` file is ignored by Git. This experiment sends resume text for embeddings and sends questions, transcript context, chat history and retrieved resume excerpts to Google Gemini. On the free tier, Google may use submitted content to improve its products; `store=false` disables Interactions object storage but does not override those free-tier data-use terms. Do not use confidential work or unredacted personal data unless you have reviewed the terms and have permission to share it.
 
 ## 2. Clone and install Python dependencies
 
@@ -282,7 +282,7 @@ python -X faulthandler main.py
 ## 11. Local data and security
 
 - Resume text is sent to Gemini for embeddings; vectors are stored locally in SQLite under `vector_db_gemini/`. The previous Ollama `vector_db/` remains untouched.
-- Gemini receives the question, transcript context, chat history and retrieved resume excerpts for answer generation. MLX Whisper transcription remains local.
+- Gemini receives the question, transcript context, chat history and retrieved resume excerpts for answer generation. MLX Whisper transcription remains local. On the Gemini free tier, Google may use submitted content to improve its products even when Interactions object storage is disabled with `store=false`.
 - Audio recordings are temporary files and are removed after transcription.
 - Do not commit resumes, transcripts, temporary audio, credentials or local databases.
 - `data/`, `vector_db/`, `vector_db_gemini/`, virtual environments and Python cache files are ignored by Git.

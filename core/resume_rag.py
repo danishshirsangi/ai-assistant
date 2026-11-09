@@ -48,13 +48,13 @@ class ResumeRAG:
                 "we will need to add OCR."
             )
 
+        filename = Path(path).name
         embeddings = self.embedding_client.embed(
             chunks, purpose="document", titles=[filename] * len(chunks)
         )
         if len(embeddings) != len(chunks):
-            raise RuntimeError("Ollama returned an unexpected number of embeddings.")
+            raise RuntimeError("Gemini returned an unexpected number of embeddings.")
 
-        filename = Path(path).name
         with self._connect() as conn:
             conn.execute("DELETE FROM chunks WHERE source_type = ?", ("resume",))
             conn.executemany(

@@ -4,9 +4,10 @@ from PyInstaller.utils.hooks import collect_all
 datas = [
     ("assets", "assets"),
     ("audio/macos_system_audio.swift", "audio"),
+]
+binaries = [
     ("build_support/system_audio_capture", "audio"),
 ]
-binaries = []
 hiddenimports = []
 
 # MLX/Whisper and the Google SDK use package resources and dynamic imports.

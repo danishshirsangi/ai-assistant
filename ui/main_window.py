@@ -377,7 +377,6 @@ class MainWindow(QMainWindow):
             self.privacy_button.setText(
                 "Capture privacy: ON (unavailable)" if enabled else "Capture privacy: OFF"
             )
-        else:
 
     def _toggle_window_visibility(self):
         """Hide or restore the main window without touching audio or workers."""

@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+from core.app_paths import env_file_path
 from google import genai
 from google.genai import types
 
@@ -19,8 +21,7 @@ class GeminiClient:
     EMBEDDING_DIMENSIONS = 768
 
     def __init__(self, api_key=None, chat_model=None, embedding_model=None):
-        project_root = Path(__file__).resolve().parents[1]
-        load_dotenv(project_root / ".env", override=False)
+        load_dotenv(env_file_path(), override=False)
 
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         configured_model = chat_model or os.getenv("GEMINI_MODEL")
@@ -123,60 +124,121 @@ class GeminiClient:
 
         config = types.GenerateContentConfig(
             system_instruction=system_instruction or None,
+            # Leave enough room for long code answers. If the model still reaches
+            # this limit, the loop below asks it to continue.
+            max_output_tokens=8192,
             thinking_config=types.ThinkingConfig(thinking_level="minimal"),
         )
 
         started = time.monotonic()
         first_text_at = None
-        parts = []
+        all_parts = []
+        request_messages = list(messages)
+        max_continuations = 2
+
         logger.info(
-            "Starting Gemini request: model=%s, prompt_chars=%s, thinking=minimal",
+            "Starting Gemini request: model=%s, prompt_chars=%s, "
+            "max_output_tokens=%s, thinking=minimal",
             self.chat_model,
             len(prompt),
+            config.max_output_tokens,
         )
 
-        if on_chunk is None:
-            response = client.models.generate_content(
-                model=self.chat_model,
-                contents=prompt,
-                config=config,
-            )
-            text = response.text or ""
-            logger.info(
-                "Gemini response completed in %.1fs",
-                time.monotonic() - started,
-            )
-            return text
+        # A response can end because it is complete or because it hit the
+        # model's output-token limit. Keep checking the finish reason and only
+        # continue when Gemini explicitly reports MAX_TOKENS.
+        for attempt in range(max_continuations + 1):
+            _, request_prompt = self._format_input(request_messages)
+            attempt_parts = []
+            finish_reason = None
 
-        # Google documents generate_content_stream as yielding response chunks
-        # whose .text property contains newly generated text.
-        stream = client.models.generate_content_stream(
-            model=self.chat_model,
-            contents=prompt,
-            config=config,
-        )
-        for chunk in stream:
-            token = chunk.text or ""
-            if not token:
-                continue
-            if first_text_at is None:
-                first_text_at = time.monotonic()
-                logger.info(
-                    "Gemini first text token after %.1fs",
-                    first_text_at - started,
+            if on_chunk is None:
+                response = client.models.generate_content(
+                    model=self.chat_model,
+                    contents=request_prompt,
+                    config=config,
                 )
-            parts.append(token)
-            on_chunk(token)
+                text = response.text or ""
+                attempt_parts.append(text)
+                candidates = getattr(response, "candidates", None) or []
+                if candidates:
+                    finish_reason = getattr(candidates[0], "finish_reason", None)
+            else:
+                stream = client.models.generate_content_stream(
+                    model=self.chat_model,
+                    contents=request_prompt,
+                    config=config,
+                )
+                for chunk in stream:
+                    token = chunk.text or ""
+                    if token:
+                        if first_text_at is None:
+                            first_text_at = time.monotonic()
+                            logger.info(
+                                "Gemini first text token after %.1fs",
+                                first_text_at - started,
+                            )
+                        attempt_parts.append(token)
+                        all_parts.append(token)
+                        on_chunk(token)
+
+                    candidates = getattr(chunk, "candidates", None) or []
+                    for candidate in candidates:
+                        reason = getattr(candidate, "finish_reason", None)
+                        if reason is not None:
+                            finish_reason = reason
+
+            attempt_text = "".join(attempt_parts)
+            if on_chunk is None:
+                all_parts.append(attempt_text)
+
+            reason_name = getattr(finish_reason, "name", str(finish_reason or ""))
+            logger.info(
+                "Gemini generation pass %s finished: reason=%s, chars=%s",
+                attempt + 1,
+                reason_name,
+                len(attempt_text),
+            )
+
+            if reason_name.upper().split(".")[-1] != "MAX_TOKENS":
+                break
+
+            if attempt == max_continuations:
+                warning = (
+                    "\\n\\n[Gemini reached its output limit again. "
+                    "This answer may still be incomplete.]"
+                )
+                logger.warning("Gemini response remains incomplete after continuations")
+                all_parts.append(warning)
+                if on_chunk is not None:
+                    on_chunk(warning)
+                break
+
+            # Add the partial answer to the conversation and ask for only the
+            # missing part. Streaming sends only the new text to the UI.
+            request_messages.extend([
+                {"role": "assistant", "content": attempt_text},
+                {
+                    "role": "user",
+                    "content": (
+                        "Your previous response stopped because it reached the "
+                        "output limit. Continue exactly where it stopped. Do not "
+                        "repeat any completed text or code. Finish all remaining "
+                        "sections, close every code block, and do not claim the "
+                        "answer is complete until it is actually complete."
+                    ),
+                },
+            ])
 
         elapsed = time.monotonic() - started
         logger.info(
-            "Gemini stream completed in %.1fs with %s text chunks",
+            "Gemini response finished in %.1fs with %s characters",
             elapsed,
-            len(parts),
+            sum(len(part) for part in all_parts),
         )
-        if not parts:
+        if not all_parts or not "".join(all_parts).strip():
             raise RuntimeError(
                 "Gemini completed the request without returning any text. "
                 "Check API quota, model availability and the terminal log."
             )
-        return "".join(parts)
+        return "".join(all_parts)

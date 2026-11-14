@@ -15,17 +15,49 @@ if [[ "$(uname -m)" != "arm64" ]]; then
   exit 1
 fi
 
-PYTHON_BIN="${PYTHON_BIN:-python3.12}"
-if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
-  echo "Python 3.12 is required. Install it, then rerun this script."
+# Locate Python 3.12 even when it is installed outside PATH (for example,
+# python.org's framework installer or Homebrew's versioned opt directory).
+PYTHON_CANDIDATES=()
+if [[ -n "${PYTHON_BIN:-}" ]]; then
+  PYTHON_CANDIDATES+=("$PYTHON_BIN")
+fi
+PYTHON_CANDIDATES+=("python3.12" "/opt/homebrew/bin/python3.12" "/usr/local/bin/python3.12")
+
+if command -v brew >/dev/null 2>&1; then
+  BREW_PYTHON="$(brew --prefix python@3.12 2>/dev/null || true)"
+  if [[ -n "$BREW_PYTHON" ]]; then
+    PYTHON_CANDIDATES+=("$BREW_PYTHON/bin/python3.12")
+  fi
+fi
+
+SELECTED_PYTHON=""
+for candidate in "${PYTHON_CANDIDATES[@]}"; do
+  if [[ "$candidate" == */* ]]; then
+    [[ -x "$candidate" ]] || continue
+    resolved_python="$candidate"
+  else
+    resolved_python="$(command -v "$candidate" 2>/dev/null || true)"
+    [[ -n "$resolved_python" ]] || continue
+  fi
+
+  if "$resolved_python" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 12) else 1)' 2>/dev/null; then
+    SELECTED_PYTHON="$resolved_python"
+    break
+  fi
+done
+
+if [[ -z "$SELECTED_PYTHON" ]]; then
+  echo "Could not locate a working Python 3.12 interpreter."
+  echo "Checked PYTHON_BIN, python3.12 on PATH, common macOS paths, and Homebrew."
+  echo "To specify it manually, run:"
+  echo '  PYTHON_BIN="/full/path/to/python3.12" ./build_macos_app.sh'
+  echo "To see installed interpreters, try: ls -l /opt/homebrew/bin/python3.12 /usr/local/bin/python3.12"
   exit 1
 fi
 
-"$PYTHON_BIN" - <<'PY'
-import sys
-if sys.version_info[:2] != (3, 12):
-    raise SystemExit("Use Python 3.12 to build this application.")
-PY
+PYTHON_BIN="$SELECTED_PYTHON"
+echo "Using Python: $PYTHON_BIN"
+"$PYTHON_BIN" --version
 
 VENV_DIR="$ROOT_DIR/.build-venv"
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then

@@ -6,11 +6,11 @@ from dotenv import set_key
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QApplication, QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
+    QApplication, QDialog, QDialogButtonBox, QLabel,
+    QLineEdit, QMessageBox, QVBoxLayout,
 )
 
-from core.app_paths import app_data_dir, env_file_path, resource_path
+from core.app_paths import env_file_path, resource_path
 from ui.main_window import MainWindow
 
 
@@ -47,9 +47,8 @@ class ApiKeyDialog(QDialog):
 
         buttons = QDialogButtonBox()
         self.save_button = buttons.addButton("Save key", QDialogButtonBox.ButtonRole.AcceptRole)
-        self.skip_button = buttons.addButton("Set up later", QDialogButtonBox.ButtonRole.RejectRole)
+        buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
         self.save_button.clicked.connect(self._save_key)
-        self.skip_button.clicked.connect(self.reject)
         layout.addWidget(buttons)
 
     def _save_key(self):
@@ -99,8 +98,7 @@ def main():
     if not os.getenv("GEMINI_API_KEY"):
         setup = ApiKeyDialog()
         if setup.exec() != QDialog.DialogCode.Accepted:
-            # Allow opening the app without a key; the user can add one later.
-            pass
+            return
 
     window = MainWindow()
     window.show()

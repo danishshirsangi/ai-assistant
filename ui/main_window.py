@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
 )
 
-from core.app_paths import app_data_dir
+from core.app_paths import app_data_dir, resource_path
 from core.answer_generator import AnswerGenerator
 from core.gemini_client import GeminiClient
 from core.resume_rag import ResumeRAG
@@ -23,7 +23,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("AI Meeting Assistant")
         self.setWindowIcon(
-            QIcon(str(Path(__file__).resolve().parents[1] / "assets" / "interview-copilot.svg"))
+            QIcon(str(resource_path("assets/interview-copilot.svg")))
         )
         # Keep the main application window above other app windows.
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)

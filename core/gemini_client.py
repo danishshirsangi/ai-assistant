@@ -50,9 +50,9 @@ class GeminiClient:
     def _require_client(self):
         if self.client is None:
             raise RuntimeError(
-                "Gemini API key not found. Add GEMINI_API_KEY=your_key to the "
-                "project's .env file, then restart Interview Copilot. Create a key "
-                "at https://aistudio.google.com/apikey."
+                "Gemini API key not found. Restart AI Meeting Assistant and enter "
+                "your key when the setup window appears. Create a key at "
+                "https://aistudio.google.com/apikey."
             )
         return self.client
 

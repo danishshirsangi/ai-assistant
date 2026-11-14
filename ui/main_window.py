@@ -143,6 +143,24 @@ class MainWindow(QMainWindow):
                 background-color: #682323;
                 border-color: #ff7979; color: #fff2f2;
             }
+            QPushButton#privacyButton[privacyState="on"] {
+                background-color: #174d2a;
+                border: 2px solid #65e889;
+                color: #d9ffe2;
+                font-weight: 900;
+            }
+            QPushButton#privacyButton[privacyState="off"] {
+                background-color: #542020;
+                border: 2px solid #ff7777;
+                color: #ffe1e1;
+                font-weight: 900;
+            }
+            QPushButton#privacyButton[privacyState="unavailable"] {
+                background-color: #594117;
+                border: 2px solid #f2c45f;
+                color: #fff1c9;
+                font-weight: 900;
+            }
             QPushButton#hideButton {
                 background-color: #101912;
                 border-color: rgba(118, 198, 134, 60); color: #a9c9b0;
@@ -164,7 +182,7 @@ class MainWindow(QMainWindow):
         self._active_question_id = None
         self._selected_question_id = None
         self._streamed_answer = ""
-        self._capture_privacy_enabled = False
+        self._capture_privacy_enabled = True
         self.audio = None
 
         # Render Markdown periodically while streaming instead of rebuilding the
@@ -242,7 +260,8 @@ class MainWindow(QMainWindow):
         clear.setText("Clear session")
         clear.clicked.connect(self.clear_chat)
 
-        self.privacy_button = QPushButton("Capture privacy: OFF")
+        self.privacy_button = QPushButton("SCREEN CAPTURE PROTECTION: ON")
+        self.privacy_button.setObjectName("privacyButton")
         self.privacy_button.clicked.connect(self._toggle_capture_privacy)
 
         self.hide_button = QPushButton("Hide window  ⌃⌥H")
@@ -369,14 +388,22 @@ class MainWindow(QMainWindow):
 
     def _apply_capture_privacy(self):
         enabled = self._capture_privacy_enabled
-        self.privacy_button.setText(
-            "Capture privacy: ON" if enabled else "Capture privacy: OFF"
-        )
         ok, detail = set_window_capture_exclusion(self, enabled)
-        if not ok:
-            self.privacy_button.setText(
-                "Capture privacy: ON (unavailable)" if enabled else "Capture privacy: OFF"
-            )
+
+        if enabled and not ok:
+            state = "unavailable"
+            label = "SCREEN CAPTURE PROTECTION: UNAVAILABLE"
+        elif enabled:
+            state = "on"
+            label = "SCREEN CAPTURE PROTECTION: ON"
+        else:
+            state = "off"
+            label = "SCREEN CAPTURE PROTECTION: OFF"
+
+        self.privacy_button.setText(label)
+        self.privacy_button.setProperty("privacyState", state)
+        self.privacy_button.style().unpolish(self.privacy_button)
+        self.privacy_button.style().polish(self.privacy_button)
 
     def _toggle_window_visibility(self):
         """Hide or restore the main window without touching audio or workers."""

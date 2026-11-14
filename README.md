@@ -680,3 +680,57 @@ Use this checklist after following the full guide:
 ## License
 
 No license has been added to this repository yet. Contact the repository owner before redistributing the application.
+
+
+---
+
+## Build a standalone macOS application (Apple Silicon)
+
+You can package the project as **AI Meeting Assistant.app** and a drag-and-drop **AI Meeting Assistant.dmg** installer. After installation, launch it from Applications or the Dock; you do not need to run `python main.py` for normal use.
+
+### Requirements for the one-time build
+
+- Apple Silicon Mac (M1 or newer), running macOS 13 or later.
+- Python 3.12.
+- Xcode Command Line Tools (the build uses `swiftc` for the ScreenCaptureKit audio helper).
+- Internet access to download Python packages and the Whisper model on first use.
+
+### Build
+
+From the project folder, check out the packaging branch and run:
+
+```bash
+git pull origin fix/complete-long-responses
+chmod +x build_macos_app.sh
+PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3.12" ./build_macos_app.sh
+```
+
+The first build can take several minutes. PyInstaller creates a self-contained app bundle and the script creates:
+
+```text
+dist/
+├── AI Meeting Assistant.app
+└── AI Meeting Assistant.dmg
+```
+
+Open the DMG, drag **AI Meeting Assistant** to **Applications**, eject the DMG, then launch the app from Applications. The build is currently unsigned and not notarized. On first launch, macOS may block it: Control-click the app in Finder, choose **Open**, and confirm. This is intended for personal use on the Mac that built it, not public distribution.
+
+### First launch and data
+
+- Enter your Gemini API key in the first-run setup window. The key is saved with owner-only file permissions in `~/Library/Application Support/AI Meeting Assistant/.env`.
+- Resume indexes are stored under `~/Library/Application Support/AI Meeting Assistant/vector_db_gemini/`.
+- The app bundle contains the Python runtime and dependencies, plus the precompiled Swift system-audio helper. It does not include your Gemini API key or Whisper model weights.
+- The Whisper model is downloaded and cached on first transcription. An internet connection is required for Gemini requests.
+- Grant Microphone, Screen & System Audio Recording, Accessibility and Input Monitoring permissions when macOS requests them. You may need to grant permissions to **AI Meeting Assistant** itself and restart it.
+- Screen capture protection remains best-effort and does not guarantee invisibility in every screen recorder or meeting app.
+
+### Updating
+
+Build a new app from the latest branch using the same command, then replace the older copy in Applications with the new one. Your API key and resume index remain in Application Support.
+
+### Troubleshooting the build
+
+- If the script says Python 3.12 is missing, install it with `brew install python@3.12`.
+- If Swift compilation fails, install or repair Xcode Command Line Tools with `xcode-select --install`.
+- If the app opens but recording fails, check macOS privacy permissions and try again.
+- This packaging setup has been added to the repository, but the actual app bundle must be built and tested on an Apple Silicon Mac. A successful GitHub commit alone does not confirm the packaged app runs.

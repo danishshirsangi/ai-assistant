@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+from core.app_paths import env_file_path
 from google import genai
 from google.genai import types
 
@@ -19,8 +21,7 @@ class GeminiClient:
     EMBEDDING_DIMENSIONS = 768
 
     def __init__(self, api_key=None, chat_model=None, embedding_model=None):
-        project_root = Path(__file__).resolve().parents[1]
-        load_dotenv(project_root / ".env", override=False)
+        load_dotenv(env_file_path(), override=False)
 
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         configured_model = chat_model or os.getenv("GEMINI_MODEL")

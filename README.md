@@ -700,6 +700,8 @@ You can package the project as **AI Meeting Assistant.app** and a drag-and-drop 
 From the project folder, check out the packaging branch and run:
 
 ```bash
+git fetch origin
+git switch fix/complete-long-responses 2>/dev/null || git switch --track origin/fix/complete-long-responses
 git pull origin fix/complete-long-responses
 chmod +x build_macos_app.sh
 PYTHON_BIN="$(brew --prefix python@3.12)/bin/python3.12" ./build_macos_app.sh

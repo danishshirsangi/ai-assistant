@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
 )
 
+from core.app_paths import app_data_dir
 from core.answer_generator import AnswerGenerator
 from core.gemini_client import GeminiClient
 from core.resume_rag import ResumeRAG
@@ -174,7 +175,7 @@ class MainWindow(QMainWindow):
         self.pool = QThreadPool.globalInstance()
         self._active_workers = set()
         self.gemini = GeminiClient()
-        self.rag = ResumeRAG(self.gemini, persist_dir="vector_db_gemini")
+        self.rag = ResumeRAG(self.gemini, persist_dir=str(app_data_dir() / "vector_db_gemini"))
         self.generator = AnswerGenerator(self.gemini, self.rag)
         self.history = []
         self.question_items = {}

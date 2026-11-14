@@ -15,6 +15,7 @@ import soundfile as sf
 from PySide6.QtCore import QObject, Signal
 
 from audio.transcriber import transcribe_local
+from core.app_paths import app_data_dir, resource_path
 
 
 class AudioController(QObject):
@@ -25,12 +26,12 @@ class AudioController(QObject):
 
     def __init__(self, project_root=None):
         super().__init__()
-        self.root = Path(project_root or Path(__file__).resolve().parents[1])
+        self.root = Path(project_root) if project_root else resource_path("")
         self.temp_root = Path(tempfile.gettempdir())
         self._cleanup_stale_sessions()
         self._session_dir = None
-        self.binary_dir = self.root / "data" / "bin"
-        self.swift_source = self.root / "audio" / "macos_system_audio.swift"
+        self.binary_dir = app_data_dir() / "data" / "bin"
+        self.swift_source = resource_path("audio/macos_system_audio.swift")
         self._lock = threading.RLock()
         self._recording = False
         self._mic_stream = None
@@ -161,6 +162,9 @@ class AudioController(QObject):
     def _compile_helper(self):
         if sys.platform != "darwin":
             raise RuntimeError("System audio capture requires macOS.")
+        bundled_binary = resource_path("audio/system_audio_capture")
+        if getattr(sys, "frozen", False) and bundled_binary.exists():
+            return bundled_binary
         if not self.swift_source.exists():
             raise RuntimeError("Missing audio/macos_system_audio.swift.")
         self.binary_dir.mkdir(parents=True, exist_ok=True)

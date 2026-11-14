@@ -240,21 +240,13 @@ class MainWindow(QMainWindow):
         upload.clicked.connect(self.upload_resume)
         clear = QPushButton("Clear")
         clear.setText("Clear session")
-        clear.setToolTip("Clear the question list, answers and session context")
         clear.clicked.connect(self.clear_chat)
 
         self.privacy_button = QPushButton("Capture privacy: OFF")
-        self.privacy_button.setToolTip(
-            "Best-effort request to exclude this window from compatible macOS capture APIs. "
-            "This does not guarantee invisibility in meeting apps."
-        )
         self.privacy_button.clicked.connect(self._toggle_capture_privacy)
 
         self.hide_button = QPushButton("Hide window  ⌃⌥H")
         self.hide_button.setObjectName("hideButton")
-        self.hide_button.setToolTip(
-            "Hide AI Meeting Assistant. Press Control + Option + H to restore it."
-        )
         self.hide_button.clicked.connect(self._toggle_window_visibility)
 
         toolbar.addWidget(model_label)
@@ -320,9 +312,6 @@ class MainWindow(QMainWindow):
         recording_row = QHBoxLayout()
         self.record_button = QPushButton("Start recording")
         self.record_button.setObjectName("recordButton")
-        self.record_button.setToolTip(
-            "Press Control + Option + R to start recording; press again to stop."
-        )
         self.record_button.clicked.connect(self._toggle_recording)
 
         microphone_label = QLabel("Microphone")
@@ -332,7 +321,6 @@ class MainWindow(QMainWindow):
         self.microphone.setToolTip("Choose the microphone used for your voice.")
         self.microphone.addItem("System default (macOS)", None)
         self.refresh_microphones_button = QPushButton("Refresh")
-        self.refresh_microphones_button.setToolTip("Refresh available microphones.")
         self.refresh_microphones_button.clicked.connect(self._refresh_microphones)
 
         self.audio_hint = QLabel("Mic + system audio · transcribed on device")
@@ -389,16 +377,7 @@ class MainWindow(QMainWindow):
             self.privacy_button.setText(
                 "Capture privacy: ON (unavailable)" if enabled else "Capture privacy: OFF"
             )
-            self.privacy_button.setToolTip(
-                "Could not apply the capture privacy request: " + detail +
-                "\nMeeting-app behaviour varies; this is not a universal guarantee."
-            )
         else:
-            self.privacy_button.setToolTip(
-                "The main window is set to " +
-                ("exclude from" if enabled else "allow") +
-                " compatible macOS capture APIs. Meeting-app behaviour varies."
-            )
 
     def _toggle_window_visibility(self):
         """Hide or restore the main window without touching audio or workers."""

@@ -1,4 +1,6 @@
 import re
+import sys
+from ctypes import c_void_p
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
@@ -380,8 +382,34 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._apply_mission_control_behavior()
         if self._capture_privacy_enabled:
             self._apply_capture_privacy()
+
+    def _apply_mission_control_behavior(self):
+        """Keep the visible assistant window out of Mission Control/Exposé."""
+        if sys.platform != "darwin":
+            return
+        try:
+            import AppKit
+            import objc
+
+            native_view = objc.objc_object(c_void_p=int(self.winId()))
+            native_window = native_view.window()
+            if native_window is None:
+                return
+
+            transient = getattr(
+                AppKit, "NSWindowCollectionBehaviorTransient", None
+            )
+            if transient is None:
+                return
+
+            behavior = native_window.collectionBehavior()
+            native_window.setCollectionBehavior_(behavior | transient)
+        except Exception:
+            # Mission Control integration is best-effort; never block the UI.
+            return
 
     def _toggle_capture_privacy(self):
         self._capture_privacy_enabled = not self._capture_privacy_enabled

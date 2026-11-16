@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QMainWindow, QMessageBox, QPushButton, QSplitter, QTextBrowser,
+    QMainWindow, QPushButton, QSplitter, QTextBrowser,
     QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -551,10 +551,7 @@ class MainWindow(QMainWindow):
 
     def _resume_done(self, path, count):
         self._set_status("Resume indexed with Gemini")
-        QMessageBox.information(
-            self, "Resume ready",
-            f"Resume indexed successfully.\n{count} sections added to local search."
-        )
+        self._set_status(f"Resume ready · {count} sections indexed")
 
     def ask(self):
         question = self.question.text().strip()
@@ -680,9 +677,10 @@ class MainWindow(QMainWindow):
         self._set_status("Error", warning=True)
         if self._selected_question_id == question_id:
             self.answer_view.setHtml(
-                "<p style='color:#ffb4a8;'>Answer generation failed. See the error dialog for details.</p>"
+                "<p style='color:#ffb4a8;'>I couldn't generate a response. "
+                "Please try again.</p>"
             )
-        QMessageBox.critical(self, "AI Meeting Assistant error", str(error))
+        self.status.setToolTip(str(error))
 
     def _answer_stage(self, stage):
         self._set_status(stage)
@@ -783,7 +781,7 @@ class MainWindow(QMainWindow):
         self._stream_render_timer.stop()
         self.ask_button.setEnabled(True)
         self._set_status("Error", warning=True)
-        QMessageBox.critical(self, "AI Meeting Assistant error", str(error))
+        self.status.setToolTip(str(error))
 
     def clear_chat(self):
         self.question_list.clear()

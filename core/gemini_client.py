@@ -114,8 +114,8 @@ class GeminiClient:
 
         return system_instruction, "\n\n".join(conversation)
 
-    def chat(self, messages, temperature=0.35, on_chunk=None):
-        """Generate text with the supported Generate Content streaming interface."""
+    def chat(self, messages, temperature=0.35, on_chunk=None, on_stage=None):
+        """Stream a response and make one continuation attempt if the stream breaks mid-answer."""
         del temperature  # Gemini 3.x recommends leaving sampling parameters at defaults.
         client = self._require_client()
         system_instruction, prompt = self._format_input(messages)
@@ -124,8 +124,6 @@ class GeminiClient:
 
         config = types.GenerateContentConfig(
             system_instruction=system_instruction or None,
-            # Leave enough room for long code answers. If the model still reaches
-            # this limit, the loop below asks it to continue.
             max_output_tokens=8192,
             thinking_config=types.ThinkingConfig(thinking_level="minimal"),
         )
@@ -135,6 +133,13 @@ class GeminiClient:
         all_parts = []
         request_messages = list(messages)
         max_continuations = 2
+        interruption_retries = 0
+        continuation_instruction = (
+            "Your previous response was interrupted before it was complete. "
+            "Continue exactly where it stopped, using the partial answer above as "
+            "the text already delivered. Do not repeat any completed text or code. "
+            "Finish the remaining sections and close every code block."
+        )
 
         logger.info(
             "Starting Gemini request: model=%s, prompt_chars=%s, "
@@ -144,49 +149,74 @@ class GeminiClient:
             config.max_output_tokens,
         )
 
-        # A response can end because it is complete or because it hit the
-        # model's output-token limit. Keep checking the finish reason and only
-        # continue when Gemini explicitly reports MAX_TOKENS.
-        for attempt in range(max_continuations + 1):
+        # MAX_TOKENS continuations are separate from the single retry allowed
+        # for a stream interruption.
+        token_continuations = 0
+        while True:
             _, request_prompt = self._format_input(request_messages)
             attempt_parts = []
             finish_reason = None
 
-            if on_chunk is None:
-                response = client.models.generate_content(
-                    model=self.chat_model,
-                    contents=request_prompt,
-                    config=config,
-                )
-                text = response.text or ""
-                attempt_parts.append(text)
-                candidates = getattr(response, "candidates", None) or []
-                if candidates:
-                    finish_reason = getattr(candidates[0], "finish_reason", None)
-            else:
-                stream = client.models.generate_content_stream(
-                    model=self.chat_model,
-                    contents=request_prompt,
-                    config=config,
-                )
-                for chunk in stream:
-                    token = chunk.text or ""
-                    if token:
-                        if first_text_at is None:
-                            first_text_at = time.monotonic()
-                            logger.info(
-                                "Gemini first text token after %.1fs",
-                                first_text_at - started,
-                            )
-                        attempt_parts.append(token)
-                        all_parts.append(token)
-                        on_chunk(token)
+            try:
+                if on_chunk is None:
+                    response = client.models.generate_content(
+                        model=self.chat_model,
+                        contents=request_prompt,
+                        config=config,
+                    )
+                    text = response.text or ""
+                    attempt_parts.append(text)
+                    candidates = getattr(response, "candidates", None) or []
+                    if candidates:
+                        finish_reason = getattr(candidates[0], "finish_reason", None)
+                else:
+                    stream = client.models.generate_content_stream(
+                        model=self.chat_model,
+                        contents=request_prompt,
+                        config=config,
+                    )
+                    for chunk in stream:
+                        token = chunk.text or ""
+                        if token:
+                            if first_text_at is None:
+                                first_text_at = time.monotonic()
+                                logger.info(
+                                    "Gemini first text token after %.1fs",
+                                    first_text_at - started,
+                                )
+                            attempt_parts.append(token)
+                            all_parts.append(token)
+                            on_chunk(token)
 
-                    candidates = getattr(chunk, "candidates", None) or []
-                    for candidate in candidates:
-                        reason = getattr(candidate, "finish_reason", None)
-                        if reason is not None:
-                            finish_reason = reason
+                        candidates = getattr(chunk, "candidates", None) or []
+                        for candidate in candidates:
+                            reason = getattr(candidate, "finish_reason", None)
+                            if reason is not None:
+                                finish_reason = reason
+
+            except Exception:
+                partial_text = "".join(attempt_parts).strip()
+                if on_chunk is None:
+                    all_parts.extend(attempt_parts)
+                if partial_text and interruption_retries < 1:
+                    interruption_retries += 1
+                    logger.exception(
+                        "Gemini stream interrupted after %s characters; "
+                        "attempting one continuation",
+                        len(partial_text),
+                    )
+                    request_messages.extend([
+                        {"role": "assistant", "content": "".join(attempt_parts)},
+                        {"role": "user", "content": continuation_instruction},
+                    ])
+                    if on_stage:
+                        on_stage("Connection interrupted · continuing your answer (retry 1/1)…")
+                    continue
+                logger.exception(
+                    "Gemini request failed; partial response length=%s",
+                    sum(len(part) for part in all_parts),
+                )
+                raise
 
             attempt_text = "".join(attempt_parts)
             if on_chunk is None:
@@ -194,41 +224,40 @@ class GeminiClient:
 
             reason_name = getattr(finish_reason, "name", str(finish_reason or ""))
             logger.info(
-                "Gemini generation pass %s finished: reason=%s, chars=%s",
-                attempt + 1,
+                "Gemini generation pass finished: reason=%s, chars=%s",
                 reason_name,
                 len(attempt_text),
             )
 
-            if reason_name.upper().split(".")[-1] != "MAX_TOKENS":
-                break
+            if reason_name.upper().split(".")[-1] == "MAX_TOKENS":
+                if token_continuations >= max_continuations:
+                    warning = (
+                        "\\n\\n[Gemini reached its output limit again. "
+                        "This answer may still be incomplete.]"
+                    )
+                    logger.warning("Gemini response remains incomplete after continuations")
+                    all_parts.append(warning)
+                    if on_chunk is not None:
+                        on_chunk(warning)
+                    break
 
-            if attempt == max_continuations:
-                warning = (
-                    "\\n\\n[Gemini reached its output limit again. "
-                    "This answer may still be incomplete.]"
-                )
-                logger.warning("Gemini response remains incomplete after continuations")
-                all_parts.append(warning)
-                if on_chunk is not None:
-                    on_chunk(warning)
-                break
+                token_continuations += 1
+                request_messages.extend([
+                    {"role": "assistant", "content": attempt_text},
+                    {
+                        "role": "user",
+                        "content": (
+                            "Your previous response stopped because it reached the "
+                            "output limit. Continue exactly where it stopped. Do not "
+                            "repeat any completed text or code. Finish all remaining "
+                            "sections, close every code block, and do not claim the "
+                            "answer is complete until it is actually complete."
+                        ),
+                    },
+                ])
+                continue
 
-            # Add the partial answer to the conversation and ask for only the
-            # missing part. Streaming sends only the new text to the UI.
-            request_messages.extend([
-                {"role": "assistant", "content": attempt_text},
-                {
-                    "role": "user",
-                    "content": (
-                        "Your previous response stopped because it reached the "
-                        "output limit. Continue exactly where it stopped. Do not "
-                        "repeat any completed text or code. Finish all remaining "
-                        "sections, close every code block, and do not claim the "
-                        "answer is complete until it is actually complete."
-                    ),
-                },
-            ])
+            break
 
         elapsed = time.monotonic() - started
         logger.info(

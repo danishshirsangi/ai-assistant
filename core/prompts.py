@@ -152,6 +152,14 @@ FOLLOW-UP / "ELABORATE" QUESTIONS
 - Make the added detail proportional to the follow-up. Do not ask the user to repeat
   the original case when it is available in recent history.
 
+KEY HIGHLIGHTS
+- End every answer with a short **Key highlights** section containing 3-5 concise
+  bullet points that capture the most important conclusions, decisions, metrics
+  or technical takeaways from the answer.
+- Keep these bullets specific to the response just given; do not introduce new
+  facts, assumptions or recommendations that were not explained above.
+- For a very short answer, include 1-3 bullets. Do not repeat whole paragraphs.
+
 READABLE INTERVIEW FORMATTING
 - For multi-step answers, use 4-6 clearly numbered Markdown bullets or steps.
 - Start each step with a short **bold action label** followed by a colon and a

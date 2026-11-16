@@ -657,6 +657,14 @@ class MainWindow(QMainWindow):
             self.answer_view.setHtml(
                 "<p style='color:#9fb7d6;'>Generating answer…</p>"
             )
+        elif entry["status"] == "partial_error":
+            warning = (
+                "<hr><div style='color:#ffb4a8;'>"
+                "<b>Generation stopped before the answer was complete.</b> "
+                "The response above has been retained. You can continue by asking a follow-up."
+                "</div>"
+            )
+            self.answer_view.setHtml(format_response_html(entry["answer"]) + warning)
         elif entry["status"] == "error":
             self.answer_view.setHtml(
                 "<p style='color:#ffb4a8;'>This answer could not be generated.</p>"
@@ -668,21 +676,35 @@ class MainWindow(QMainWindow):
 
     def _question_error(self, question_id, error):
         entry = self.question_items.get(question_id)
+        partial_answer = self._streamed_answer if question_id == self._active_question_id else ""
         if entry is not None:
-            entry["status"] = "error"
+            # Keep whatever Gemini streamed before the request failed.
+            entry["answer"] = partial_answer
+            entry["status"] = "partial_error" if partial_answer.strip() else "error"
         self._stream_render_timer.stop()
         self.ask_button.setEnabled(True)
-        self._set_status("Error", warning=True)
+        self._set_status("Response interrupted" if partial_answer.strip() else "Error", warning=True)
         if self._selected_question_id == question_id:
             safe_error = html.escape(str(error)[:3000])
-            self.answer_view.setHtml(
-                "<div style='color:#ffb4a8;'>"
-                "<h3>Response generation failed</h3>"
-                "<p>The request could not be completed. Technical details:</p>"
-                f"<pre style='white-space:pre-wrap;color:#ffd7d2;'>{safe_error}</pre>"
-                "<p style='color:#9fb7a6;'>You can try again. Full details are saved in the application log.</p>"
-                "</div>"
-            )
+            if partial_answer.strip():
+                self.answer_view.setHtml(
+                    format_response_html(partial_answer)
+                    + "<hr><div style='color:#ffb4a8;'>"
+                    "<b>Generation stopped unexpectedly.</b> "
+                    "Your partial response is saved above; it has not been discarded."
+                    "<br><span style='color:#9fb7a6;'>Technical details:</span>"
+                    f"<pre style='white-space:pre-wrap;color:#ffd7d2;'>{safe_error}</pre>"
+                    "</div>"
+                )
+            else:
+                self.answer_view.setHtml(
+                    "<div style='color:#ffb4a8;'>"
+                    "<h3>Response generation failed</h3>"
+                    "<p>No response text was received. Technical details:</p>"
+                    f"<pre style='white-space:pre-wrap;color:#ffd7d2;'>{safe_error}</pre>"
+                    "<p style='color:#9fb7a6;'>You can try again. Full details are saved in the application log.</p>"
+                    "</div>"
+                )
         self.status.setToolTip(str(error))
 
     def _answer_stage(self, stage):

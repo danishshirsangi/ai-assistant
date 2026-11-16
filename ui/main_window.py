@@ -1,3 +1,4 @@
+import html
 import re
 import sys
 from ctypes import c_void_p
@@ -673,9 +674,14 @@ class MainWindow(QMainWindow):
         self.ask_button.setEnabled(True)
         self._set_status("Error", warning=True)
         if self._selected_question_id == question_id:
+            safe_error = html.escape(str(error)[:3000])
             self.answer_view.setHtml(
-                "<p style='color:#ffb4a8;'>I couldn't generate a response. "
-                "Please try again.</p>"
+                "<div style='color:#ffb4a8;'>"
+                "<h3>Response generation failed</h3>"
+                "<p>The request could not be completed. Technical details:</p>"
+                f"<pre style='white-space:pre-wrap;color:#ffd7d2;'>{safe_error}</pre>"
+                "<p style='color:#9fb7a6;'>You can try again. Full details are saved in the application log.</p>"
+                "</div>"
             )
         self.status.setToolTip(str(error))
 
@@ -779,6 +785,15 @@ class MainWindow(QMainWindow):
         self.ask_button.setEnabled(True)
         self._set_status("Error", warning=True)
         self.status.setToolTip(str(error))
+        safe_error = html.escape(str(error)[:3000])
+        self.answer_view.setHtml(
+            "<div style='color:#ffb4a8;'>"
+            "<h3>Operation failed</h3>"
+            "<p>Technical details:</p>"
+            f"<pre style='white-space:pre-wrap;color:#ffd7d2;'>{safe_error}</pre>"
+            "<p style='color:#9fb7a6;'>Full details are saved in the application log.</p>"
+            "</div>"
+        )
 
     def clear_chat(self):
         self.question_list.clear()

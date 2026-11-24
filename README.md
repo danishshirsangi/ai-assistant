@@ -684,6 +684,43 @@ No license has been added to this repository yet. Contact the repository owner b
 
 ---
 
+## Build and download the macOS app with GitHub Actions
+
+You can build the Apple Silicon application entirely on GitHub. **You do not need to build it on your own Mac.**
+
+### One-click build
+
+1. Open the repository: https://github.com/danishshirsangi/ai-assistant
+2. Select the **Actions** tab.
+3. Choose **Build macOS app** from the workflow list.
+4. Click **Run workflow**, keep the branch set to `main`, then click **Run workflow** again.
+5. Open the new workflow run and wait for the build to finish successfully.
+
+The workflow runs on a GitHub-hosted Apple Silicon Mac (`macos-15`), installs Python 3.12 and the project build dependencies, compiles the native Swift system-audio helper, then creates:
+
+- `AI Meeting Assistant.dmg` — open this and drag the app into Applications.
+- `AI Meeting Assistant.app.zip` — the standalone app bundle, zipped to preserve macOS bundle metadata.
+- `SHA256SUMS.txt` — checksums to verify the downloads.
+
+### Where to download
+
+Each successful run publishes the files in two places:
+
+- **Workflow artifact:** open the run's **Artifacts** section. The artifact is retained for 30 days.
+- **GitHub prerelease:** open the repository's **Releases** page. Each run creates a separate prerelease with the DMG, app ZIP and checksums attached.
+
+### First launch notes
+
+- These automated builds are currently **unsigned and not notarized**. On first launch, macOS may block the app. In Finder, Control-click the app, choose **Open**, then confirm.
+- The app requires macOS 13 or later on Apple Silicon.
+- Enter your Gemini API key in the first-run setup window. It is stored locally in your macOS Application Support folder and is not embedded in the app.
+- The Whisper model is downloaded and cached when first needed, so the first transcription requires an internet connection.
+- Grant Microphone, Screen & System Audio Recording, Accessibility and Input Monitoring permissions when macOS asks.
+
+The workflow always checks out the latest commit on `main`, so you do not need to change branches or run the local build script. You can rerun it whenever you push new code to `main`.
+
+---
+
 ## Build a standalone macOS application (Apple Silicon)
 
 You can package the project as **AI Meeting Assistant.app** and a drag-and-drop **AI Meeting Assistant.dmg** installer. After installation, launch it from Applications or the Dock; you do not need to run `python main.py` for normal use.

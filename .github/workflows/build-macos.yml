@@ -1,5 +1,5 @@
 name: Build macOS app
-run-name: Build macOS app #${{ github.run_number }}
+run-name: 'Build macOS app #${{ github.run_number }}'
 
 on:
   workflow_dispatch:
@@ -19,12 +19,12 @@ jobs:
 
     steps:
       - name: Check out latest main
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: main
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.12"
           architecture: arm64
@@ -76,7 +76,7 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: AI-Meeting-Assistant-macOS-arm64-${{ github.run_number }}
           path: |
@@ -87,11 +87,11 @@ jobs:
           retention-days: 30
 
       - name: Publish downloadable GitHub prerelease
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: macos-build-${{ github.run_id }}-${{ github.run_attempt }}
           target_commitish: main
-          name: AI Meeting Assistant macOS build #${{ github.run_number }}
+          name: 'AI Meeting Assistant macOS build #${{ github.run_number }}'
           body: |
             Automated Apple Silicon build of AI Meeting Assistant.
 

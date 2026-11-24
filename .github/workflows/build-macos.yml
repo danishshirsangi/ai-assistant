@@ -49,7 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PYTHON_BIN="$(python -c 'import sys; print(sys.executable)')" ./build_macos_app.sh
+          PYTHON_BIN="$(python -c 'import sys; print(sys.executable)')" bash ./build_macos_app.sh
 
       - name: Package app and create checksums
         shell: bash

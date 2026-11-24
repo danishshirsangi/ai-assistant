@@ -1,4 +1,8 @@
+import logging
+
 from PySide6.QtCore import QObject, Signal, QRunnable, Slot
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerSignals(QObject):
@@ -33,7 +37,8 @@ class FunctionWorker(QRunnable):
                 kwargs["on_stage"] = self.signals.stage.emit
             result = self.fn(*self.args, **kwargs)
         except Exception as exc:
-            self.signals.error.emit(str(exc))
+            logger.exception("Background task failed: %s", getattr(self.fn, "__qualname__", repr(self.fn)))
+            self.signals.error.emit(f"{type(exc).__name__}: {exc}")
         else:
             self.signals.result.emit(result)
         finally:

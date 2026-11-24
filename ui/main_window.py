@@ -1,14 +1,18 @@
+import html
 import re
+import sys
+from ctypes import c_void_p
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QMainWindow, QMessageBox, QPushButton, QSplitter, QTextBrowser,
+    QMainWindow, QPushButton, QSplitter, QTextBrowser,
     QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
 )
 
+from core.app_paths import app_data_dir, resource_path
 from core.answer_generator import AnswerGenerator
 from core.gemini_client import GeminiClient
 from core.resume_rag import ResumeRAG
@@ -22,7 +26,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("AI Meeting Assistant")
         self.setWindowIcon(
-            QIcon(str(Path(__file__).resolve().parents[1] / "assets" / "interview-copilot.svg"))
+            QIcon(str(resource_path("assets/interview-copilot.svg")))
         )
         # Keep the main application window above other app windows.
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
@@ -143,6 +147,24 @@ class MainWindow(QMainWindow):
                 background-color: #682323;
                 border-color: #ff7979; color: #fff2f2;
             }
+            QPushButton#privacyButton[privacyState="on"] {
+                background-color: #174d2a;
+                border: 2px solid #65e889;
+                color: #d9ffe2;
+                font-weight: 900;
+            }
+            QPushButton#privacyButton[privacyState="off"] {
+                background-color: #542020;
+                border: 2px solid #ff7777;
+                color: #ffe1e1;
+                font-weight: 900;
+            }
+            QPushButton#privacyButton[privacyState="unavailable"] {
+                background-color: #594117;
+                border: 2px solid #f2c45f;
+                color: #fff1c9;
+                font-weight: 900;
+            }
             QPushButton#hideButton {
                 background-color: #101912;
                 border-color: rgba(118, 198, 134, 60); color: #a9c9b0;
@@ -156,7 +178,7 @@ class MainWindow(QMainWindow):
         self.pool = QThreadPool.globalInstance()
         self._active_workers = set()
         self.gemini = GeminiClient()
-        self.rag = ResumeRAG(self.gemini, persist_dir="vector_db_gemini")
+        self.rag = ResumeRAG(self.gemini, persist_dir=str(app_data_dir() / "vector_db_gemini"))
         self.generator = AnswerGenerator(self.gemini, self.rag)
         self.history = []
         self.question_items = {}
@@ -164,7 +186,7 @@ class MainWindow(QMainWindow):
         self._active_question_id = None
         self._selected_question_id = None
         self._streamed_answer = ""
-        self._capture_privacy_enabled = False
+        self._capture_privacy_enabled = True
         self.audio = None
 
         # Render Markdown periodically while streaming instead of rebuilding the
@@ -214,11 +236,8 @@ class MainWindow(QMainWindow):
         header = QHBoxLayout()
         title_group = QVBoxLayout()
         title_group.setSpacing(2)
-        title = QLabel("AI Meeting Assistant")
-        title.setObjectName("appTitle")
         subtitle = QLabel("Your live meeting and interview copilot")
         subtitle.setObjectName("appSubtitle")
-        title_group.addWidget(title)
         title_group.addWidget(subtitle)
         header.addLayout(title_group)
         header.addStretch()
@@ -240,21 +259,14 @@ class MainWindow(QMainWindow):
         upload.clicked.connect(self.upload_resume)
         clear = QPushButton("Clear")
         clear.setText("Clear session")
-        clear.setToolTip("Clear the question list, answers and session context")
         clear.clicked.connect(self.clear_chat)
 
-        self.privacy_button = QPushButton("Capture privacy: OFF")
-        self.privacy_button.setToolTip(
-            "Best-effort request to exclude this window from compatible macOS capture APIs. "
-            "This does not guarantee invisibility in meeting apps."
-        )
+        self.privacy_button = QPushButton("SCREEN CAPTURE PROTECTION: ON")
+        self.privacy_button.setObjectName("privacyButton")
         self.privacy_button.clicked.connect(self._toggle_capture_privacy)
 
         self.hide_button = QPushButton("Hide window  ⌃⌥H")
         self.hide_button.setObjectName("hideButton")
-        self.hide_button.setToolTip(
-            "Hide AI Meeting Assistant. Press Control + Option + H to restore it."
-        )
         self.hide_button.clicked.connect(self._toggle_window_visibility)
 
         toolbar.addWidget(model_label)
@@ -320,9 +332,6 @@ class MainWindow(QMainWindow):
         recording_row = QHBoxLayout()
         self.record_button = QPushButton("Start recording")
         self.record_button.setObjectName("recordButton")
-        self.record_button.setToolTip(
-            "Press Control + Option + R to start recording; press again to stop."
-        )
         self.record_button.clicked.connect(self._toggle_recording)
 
         microphone_label = QLabel("Microphone")
@@ -332,7 +341,6 @@ class MainWindow(QMainWindow):
         self.microphone.setToolTip("Choose the microphone used for your voice.")
         self.microphone.addItem("System default (macOS)", None)
         self.refresh_microphones_button = QPushButton("Refresh")
-        self.refresh_microphones_button.setToolTip("Refresh available microphones.")
         self.refresh_microphones_button.clicked.connect(self._refresh_microphones)
 
         self.audio_hint = QLabel("Mic + system audio · transcribed on device")
@@ -372,8 +380,34 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._apply_mission_control_behavior()
         if self._capture_privacy_enabled:
             self._apply_capture_privacy()
+
+    def _apply_mission_control_behavior(self):
+        """Keep the visible assistant window out of Mission Control/Exposé."""
+        if sys.platform != "darwin":
+            return
+        try:
+            import AppKit
+            import objc
+
+            native_view = objc.objc_object(c_void_p=int(self.winId()))
+            native_window = native_view.window()
+            if native_window is None:
+                return
+
+            transient = getattr(
+                AppKit, "NSWindowCollectionBehaviorTransient", None
+            )
+            if transient is None:
+                return
+
+            behavior = native_window.collectionBehavior()
+            native_window.setCollectionBehavior_(behavior | transient)
+        except Exception:
+            # Mission Control integration is best-effort; never block the UI.
+            return
 
     def _toggle_capture_privacy(self):
         self._capture_privacy_enabled = not self._capture_privacy_enabled
@@ -381,24 +415,22 @@ class MainWindow(QMainWindow):
 
     def _apply_capture_privacy(self):
         enabled = self._capture_privacy_enabled
-        self.privacy_button.setText(
-            "Capture privacy: ON" if enabled else "Capture privacy: OFF"
-        )
         ok, detail = set_window_capture_exclusion(self, enabled)
-        if not ok:
-            self.privacy_button.setText(
-                "Capture privacy: ON (unavailable)" if enabled else "Capture privacy: OFF"
-            )
-            self.privacy_button.setToolTip(
-                "Could not apply the capture privacy request: " + detail +
-                "\nMeeting-app behaviour varies; this is not a universal guarantee."
-            )
+
+        if enabled and not ok:
+            state = "unavailable"
+            label = "SCREEN CAPTURE PROTECTION: UNAVAILABLE"
+        elif enabled:
+            state = "on"
+            label = "SCREEN CAPTURE PROTECTION: ON"
         else:
-            self.privacy_button.setToolTip(
-                "The main window is set to " +
-                ("exclude from" if enabled else "allow") +
-                " compatible macOS capture APIs. Meeting-app behaviour varies."
-            )
+            state = "off"
+            label = "SCREEN CAPTURE PROTECTION: OFF"
+
+        self.privacy_button.setText(label)
+        self.privacy_button.setProperty("privacyState", state)
+        self.privacy_button.style().unpolish(self.privacy_button)
+        self.privacy_button.style().polish(self.privacy_button)
 
     def _toggle_window_visibility(self):
         """Hide or restore the main window without touching audio or workers."""
@@ -517,10 +549,7 @@ class MainWindow(QMainWindow):
 
     def _resume_done(self, path, count):
         self._set_status("Resume indexed with Gemini")
-        QMessageBox.information(
-            self, "Resume ready",
-            f"Resume indexed successfully.\n{count} sections added to local search."
-        )
+        self._set_status(f"Resume ready · {count} sections indexed")
 
     def ask(self):
         question = self.question.text().strip()
@@ -628,6 +657,14 @@ class MainWindow(QMainWindow):
             self.answer_view.setHtml(
                 "<p style='color:#9fb7d6;'>Generating answer…</p>"
             )
+        elif entry["status"] == "partial_error":
+            warning = (
+                "<hr><div style='color:#ffb4a8;'>"
+                "<b>Generation stopped before the answer was complete.</b> "
+                "The response above has been retained. You can continue by asking a follow-up."
+                "</div>"
+            )
+            self.answer_view.setHtml(format_response_html(entry["answer"]) + warning)
         elif entry["status"] == "error":
             self.answer_view.setHtml(
                 "<p style='color:#ffb4a8;'>This answer could not be generated.</p>"
@@ -639,16 +676,36 @@ class MainWindow(QMainWindow):
 
     def _question_error(self, question_id, error):
         entry = self.question_items.get(question_id)
+        partial_answer = self._streamed_answer if question_id == self._active_question_id else ""
         if entry is not None:
-            entry["status"] = "error"
+            # Keep whatever Gemini streamed before the request failed.
+            entry["answer"] = partial_answer
+            entry["status"] = "partial_error" if partial_answer.strip() else "error"
         self._stream_render_timer.stop()
         self.ask_button.setEnabled(True)
-        self._set_status("Error", warning=True)
+        self._set_status("Response interrupted" if partial_answer.strip() else "Error", warning=True)
         if self._selected_question_id == question_id:
-            self.answer_view.setHtml(
-                "<p style='color:#ffb4a8;'>Answer generation failed. See the error dialog for details.</p>"
-            )
-        QMessageBox.critical(self, "AI Meeting Assistant error", str(error))
+            safe_error = html.escape(str(error)[:3000])
+            if partial_answer.strip():
+                self.answer_view.setHtml(
+                    format_response_html(partial_answer)
+                    + "<hr><div style='color:#ffb4a8;'>"
+                    "<b>Generation stopped unexpectedly.</b> "
+                    "Your partial response is saved above; it has not been discarded."
+                    "<br><span style='color:#9fb7a6;'>Technical details:</span>"
+                    f"<pre style='white-space:pre-wrap;color:#ffd7d2;'>{safe_error}</pre>"
+                    "</div>"
+                )
+            else:
+                self.answer_view.setHtml(
+                    "<div style='color:#ffb4a8;'>"
+                    "<h3>Response generation failed</h3>"
+                    "<p>No response text was received. Technical details:</p>"
+                    f"<pre style='white-space:pre-wrap;color:#ffd7d2;'>{safe_error}</pre>"
+                    "<p style='color:#9fb7a6;'>You can try again. Full details are saved in the application log.</p>"
+                    "</div>"
+                )
+        self.status.setToolTip(str(error))
 
     def _answer_stage(self, stage):
         self._set_status(stage)
@@ -749,7 +806,16 @@ class MainWindow(QMainWindow):
         self._stream_render_timer.stop()
         self.ask_button.setEnabled(True)
         self._set_status("Error", warning=True)
-        QMessageBox.critical(self, "AI Meeting Assistant error", str(error))
+        self.status.setToolTip(str(error))
+        safe_error = html.escape(str(error)[:3000])
+        self.answer_view.setHtml(
+            "<div style='color:#ffb4a8;'>"
+            "<h3>Operation failed</h3>"
+            "<p>Technical details:</p>"
+            f"<pre style='white-space:pre-wrap;color:#ffd7d2;'>{safe_error}</pre>"
+            "<p style='color:#9fb7a6;'>Full details are saved in the application log.</p>"
+            "</div>"
+        )
 
     def clear_chat(self):
         self.question_list.clear()

@@ -6,3 +6,10 @@ data/
 vector_db/
 .env
 vector_db_gemini/
+
+# macOS standalone application build outputs
+.build-venv/
+build/
+dist/
+*.spec.bak
+build_support/

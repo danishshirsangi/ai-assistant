@@ -213,15 +213,38 @@ def format_response_html(text):
 
     def flush_code():
         nonlocal code_lines, code_language
-        language = html.escape(code_language or "code")
-        source = html.escape("\n".join(code_lines), quote=False)
+        language_name = (code_language or "text").lower()
+        language_label = html.escape(code_language or "Code")
+        source_text = "\n".join(code_lines)
+
+        # Pygments returns escaped source with token-level inline colours.
+        # Unknown language labels safely fall back to plain text.
+        try:
+            from pygments import highlight
+            from pygments.formatters import HtmlFormatter
+            from pygments.lexers import get_lexer_by_name
+            try:
+                lexer = get_lexer_by_name(language_name, stripnl=False)
+            except Exception:
+                from pygments.lexers import TextLexer
+                lexer = TextLexer(stripnl=False)
+            highlighted = highlight(
+                source_text,
+                lexer,
+                HtmlFormatter(style="monokai", noclasses=True, nowrap=True),
+            )
+        except ImportError:
+            highlighted = html.escape(source_text, quote=False)
+
         out.append(
-            "<p style='margin:9px 0 4px;color:#9fc5ff;font-size:11px;'><b>"
-            + language + "</b></p>"
-            "<pre style='white-space:pre-wrap;background:#101a29;color:#e6edf3;"
-            "padding:12px;border:1px solid #354b6b;border-radius:8px;"
-            "font-family:Menlo,monospace;font-size:12px;'>"
-            + source + "</pre>"
+            "<div style='margin:12px 0 14px;border:1px solid #34445d;"
+            "border-radius:9px;overflow:hidden;background:#1e1e1e;'>"
+            "<div style='padding:7px 11px;background:#252526;border-bottom:1px solid #343434;"
+            "color:#b9c7d8;font-size:10px;font-weight:bold;'>"
+            + language_label +
+            "</div><pre style='white-space:pre;background:#1e1e1e;color:#d4d4d4;"
+            "padding:12px;margin:0;font-family:Menlo,Consolas,monospace;font-size:12px;'>"
+            + highlighted + "</pre></div>"
         )
         code_lines, code_language = [], ""
 

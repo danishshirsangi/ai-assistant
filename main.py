@@ -80,10 +80,12 @@ def main():
     app.setOrganizationName("Danish Shirsangi")
     app.setQuitOnLastWindowClosed(True)
 
-    # A normal Dock/Command-Tab entry makes this behave like a regular Mac app.
+    # Run as a macOS accessory app: keep its windows usable without a Dock
+    # icon or a Command-Tab entry. LSUIElement in the PyInstaller spec applies
+    # the same behavior from the moment the packaged app launches.
     try:
-        from AppKit import NSApp, NSApplicationActivationPolicyRegular
-        NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+        from AppKit import NSApp, NSApplicationActivationPolicyAccessory
+        NSApp.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
     except ImportError:
         pass
 

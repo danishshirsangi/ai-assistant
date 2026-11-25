@@ -51,6 +51,14 @@ jobs:
           set -euo pipefail
           PYTHON_BIN="$(python -c 'import sys; print(sys.executable)')" bash ./build_macos_app.sh
 
+      - name: Verify the app has no Dock icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PLIST="dist/AI Meeting Assistant.app/Contents/Info.plist"
+          test -f "$APP_PLIST"
+          /usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP_PLIST" | grep -qx "true"
+
       - name: Package app and create checksums
         shell: bash
         run: |

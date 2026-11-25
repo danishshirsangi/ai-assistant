@@ -713,6 +713,7 @@ Each successful run publishes the files in two places:
 
 - These automated builds are currently **unsigned and not notarized**. On first launch, macOS may block the app. In Finder, Control-click the app, choose **Open**, then confirm.
 - The app requires macOS 13 or later on Apple Silicon.
+- The app runs as a macOS accessory app: its window remains usable, but it does not show an icon in the Dock or Command-Tab switcher.
 - Enter your Gemini API key in the first-run setup window. It is stored locally in your macOS Application Support folder and is not embedded in the app.
 - The Whisper model is downloaded and cached when first needed, so the first transcription requires an internet connection.
 - Grant Microphone, Screen & System Audio Recording, Accessibility and Input Monitoring permissions when macOS asks.

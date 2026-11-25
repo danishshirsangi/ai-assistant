@@ -82,6 +82,8 @@ app = BUNDLE(
     bundle_identifier="com.danishshirsangi.aimeetingassistant",
     info_plist={
         "CFBundleDisplayName": "AI Meeting Assistant",
+        # Treat the app as a UI element: no Dock icon or Cmd-Tab entry.
+        "LSUIElement": True,
         "LSMinimumSystemVersion": "13.0",
         "NSMicrophoneUsageDescription": "AI Meeting Assistant uses the microphone to record and transcribe your meeting audio locally.",
         "NSScreenCaptureUsageDescription": "AI Meeting Assistant uses ScreenCaptureKit to capture system audio during a recording.",
